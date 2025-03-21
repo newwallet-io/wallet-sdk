@@ -1,6 +1,6 @@
 {
   "name": "@newwallet/wallet-sdk",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Official SDK for interacting with NewWallet",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

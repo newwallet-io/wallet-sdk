@@ -33,7 +33,7 @@ const wallet = new NewWallet();
 ### Direct script tag
 
 ```html
-<script src="https://unpkg.com/newwallet-sdk@latest/dist/index.umd.js"></script>
+<script src="https://unpkg.com/@newwallet/wallet-sdk@latest/dist/index.js"></script>
 ```
 
 ## Ethereum API
