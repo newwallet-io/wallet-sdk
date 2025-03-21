@@ -249,7 +249,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate successful signing
-      simulateWalletMessage('SIGN_MESSAGE', {
+      simulateWalletMessage('ETH_SIGN_MESSAGE', {
         message: 'Message signed successfully',
         result: {
           signature: '0xsignature',
@@ -300,7 +300,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate user rejecting the signing
-      simulateWalletMessage('SIGN_MESSAGE', {
+      simulateWalletMessage('ETH_SIGN_MESSAGE', {
         message: 'User rejected the signing request',
         errorCode: ErrorCode.USER_REJECTED,
       });
@@ -339,7 +339,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Now simulate the wallet sending a successful transaction response
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           hash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
@@ -420,7 +420,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate successful signing
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xf86c8085...', // Example signed transaction data
@@ -477,7 +477,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate user rejecting the signing
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'User rejected the transaction signing request',
         errorCode: ErrorCode.USER_REJECTED,
       });
@@ -538,7 +538,7 @@ describe('NewWallet SDK', () => {
 
       // Simulate wallet flow to complete the test
       simulateWalletMessage('READY');
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx',
@@ -573,7 +573,7 @@ describe('NewWallet SDK', () => {
       // Check if postMessage was called with correct data
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'SIGN_TRANSACTION',
+          type: 'ETH_SIGN_TRANSACTION',
           network: 'ethereum',
           payload: txParams,
         }),
@@ -581,7 +581,7 @@ describe('NewWallet SDK', () => {
       );
 
       // Complete the test
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx',
@@ -632,7 +632,7 @@ describe('NewWallet SDK', () => {
       expect(mockPopup.postMessage).toHaveBeenCalled();
 
       // Complete the test
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx',
@@ -663,7 +663,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate successful signing
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx',
@@ -699,7 +699,7 @@ describe('NewWallet SDK', () => {
 
       // Simulate wallet ready and successful signing
       simulateWalletMessage('READY');
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx',
@@ -748,7 +748,7 @@ describe('NewWallet SDK', () => {
 
       // Simulate wallet ready and successful signing for first transaction
       simulateWalletMessage('READY');
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction 1 signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx1',
@@ -774,7 +774,7 @@ describe('NewWallet SDK', () => {
 
       // Simulate wallet ready and successful signing for second transaction
       simulateWalletMessage('READY');
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Transaction 2 signed successfully',
         result: {
           signedTransaction: '0xtestsignedtx2',
@@ -807,7 +807,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Simulate wallet returning error
-      simulateWalletMessage('SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
         message: 'Wallet internal error',
         errorCode: ErrorCode.INTERNAL_ERROR,
       });
