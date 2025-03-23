@@ -21,7 +21,7 @@ This guide provides examples of how to integrate NewWallet SDK with popular web 
 
 ```jsx
 import React, { useState, useEffect } from 'react';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 function WalletConnection() {
   const [wallet, setWallet] = useState(null);
@@ -110,7 +110,7 @@ Create a reusable hook for wallet functionality:
 ```jsx
 // useWallet.js
 import { useState, useEffect } from 'react';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 export function useWallet() {
   const [wallet] = useState(() => new NewWallet());
@@ -218,7 +218,7 @@ For application-wide wallet state:
 ```jsx
 // WalletContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 const WalletContext = createContext(null);
 
@@ -376,7 +376,7 @@ function WalletStatus() {
 </template>
 
 <script>
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 export default {
   data() {
@@ -458,7 +458,7 @@ For Vue 3 with Composition API:
 ```javascript
 // useWallet.js
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 export function useWallet() {
   const wallet = ref(new NewWallet());
@@ -566,7 +566,7 @@ const { account, chainId, isConnecting, error, connect, disconnect } = useWallet
 // wallet.service.ts
 import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 @Injectable({
   providedIn: 'root'
@@ -722,7 +722,7 @@ export function useWallet() {
   // Initialize wallet client-side only
   useEffect(() => {
     // Dynamic import to avoid SSR issues
-    import('newwallet-sdk').then((NewWalletModule) => {
+    import('@newwallet/wallet-sdk').then((NewWalletModule) => {
       const NewWallet = NewWalletModule.default;
       setWallet(new NewWallet());
     });
@@ -768,7 +768,7 @@ export function useWallet() {
 <!-- Wallet.svelte -->
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import NewWallet from 'newwallet-sdk';
+  import NewWallet from '@newwallet/wallet-sdk';
   
   let wallet;
   let account = null;
@@ -863,7 +863,7 @@ Here's an example of how to support both Ethereum and Solana in React:
 ```jsx
 // useMultiChainWallet.js
 import { useState, useEffect } from 'react';
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 export function useMultiChainWallet() {
   const [wallet] = useState(() => new NewWallet());

@@ -9,13 +9,13 @@ NewWallet SDK allows developers to connect their decentralized applications (DAp
 ### NPM
 
 ```bash
-npm install newwallet-sdk
+npm install @newwallet/wallet-sdk
 ```
 
 ### Yarn
 
 ```bash
-yarn add newwallet-sdk
+yarn add @newwallet/wallet-sdk
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ yarn add newwallet-sdk
 ### Initialize the SDK
 
 ```javascript
-import NewWallet from 'newwallet-sdk';
+import NewWallet from '@newwallet/wallet-sdk';
 
 // Initialize with default options
 const wallet = new NewWallet();
@@ -300,7 +300,7 @@ wallet.solana.off('connect', handleConnect);
 The SDK provides a standardized error system with error codes and messages:
 
 ```javascript
-import { ErrorCode } from 'newwallet-sdk';
+import { ErrorCode } from '@newwallet/wallet-sdk';
 
 try {
   // Attempt an operation
@@ -389,6 +389,6 @@ Common error codes:
 
 For more information, examples, and updates:
 
-- [GitHub Repository](https://github.com/newwallet-io/newwallet-sdk)
-- [Issue Tracker](https://github.com/newwallet-io/newwallet-sdk/issues)
-- [Demo Applications](https://github.com/newwallet-io/newwallet-sdk/tree/main/examples)
+- [GitHub Repository](https://github.com/newwallet-io/@newwallet/wallet-sdk)
+- [Issue Tracker](https://github.com/newwallet-io/@newwallet/wallet-sdk/issues)
+- [Demo Applications](https://github.com/newwallet-io/@newwallet/wallet-sdk/tree/main/examples)

@@ -204,6 +204,63 @@ export class SolanaProvider {
   }
 
   /**
+   * Verify that a transaction can be signed by the connected account
+   * @param transaction The transaction to verify (Transaction or VersionedTransaction)
+   * @throws ProviderError if the transaction doesn't belong to the connected account
+   */
+  private _verifyTransactionOwnership(transaction: any): void {
+    if (!this._publicKey) {
+      throw new ProviderError(
+        ErrorCode.UNAUTHORIZED,
+        'No public key available. Please connect first.'
+      );
+    }
+
+    // Simple case: check if the feePayer matches our public key
+    if (transaction.feePayer) {
+      const feePayer =
+        typeof transaction.feePayer === 'string'
+          ? transaction.feePayer
+          : transaction.feePayer.toString();
+
+      if (feePayer !== this._publicKey) {
+        throw new ProviderError(
+          ErrorCode.UNAUTHORIZED,
+          'Transaction fee payer does not match connected account.'
+        );
+      }
+      return;
+    }
+
+    // For VersionedTransaction with message
+    if (
+      transaction.version !== undefined &&
+      transaction.message &&
+      transaction.message.staticAccountKeys &&
+      transaction.message.staticAccountKeys.length > 0
+    ) {
+      const firstKey =
+        typeof transaction.message.staticAccountKeys[0] === 'string'
+          ? transaction.message.staticAccountKeys[0]
+          : transaction.message.staticAccountKeys[0].toString();
+
+      if (firstKey !== this._publicKey) {
+        throw new ProviderError(
+          ErrorCode.UNAUTHORIZED,
+          'Transaction first signer does not match connected account.'
+        );
+      }
+      return;
+    }
+
+    // We couldn't verify ownership based on common transaction properties
+    throw new ProviderError(
+      ErrorCode.UNAUTHORIZED,
+      'Unable to verify transaction ownership. Please ensure the transaction is properly constructed.'
+    );
+  }
+
+  /**
    * Sign a transaction
    * @param transaction The transaction to sign
    * @returns A promise that resolves to the signed transaction
@@ -213,12 +270,8 @@ export class SolanaProvider {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
 
-    if (!this._publicKey) {
-      throw new ProviderError(
-        ErrorCode.UNAUTHORIZED,
-        'No public key available. Please connect first.'
-      );
-    }
+    // Verify transaction ownership
+    this._verifyTransactionOwnership(transaction);
 
     return new Promise((resolve, reject) => {
       const popup = openPopup(this._targetWalletUrl);
@@ -291,11 +344,17 @@ export class SolanaProvider {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
 
-    if (!this._publicKey) {
-      throw new ProviderError(
-        ErrorCode.UNAUTHORIZED,
-        'No public key available. Please connect first.'
-      );
+    // Verify all transactions
+    for (let i = 0; i < transactions.length; i++) {
+      try {
+        this._verifyTransactionOwnership(transactions[i]);
+      } catch (error) {
+        // Add context about which transaction failed
+        if (error instanceof ProviderError) {
+          throw new ProviderError(error.code, `Transaction at index ${i}: ${error.message}`);
+        }
+        throw error;
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -367,12 +426,8 @@ export class SolanaProvider {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
 
-    if (!this._publicKey) {
-      throw new ProviderError(
-        ErrorCode.UNAUTHORIZED,
-        'No public key available. Please connect first.'
-      );
-    }
+    // Verify transaction ownership
+    this._verifyTransactionOwnership(transaction);
 
     return new Promise((resolve, reject) => {
       const popup = openPopup(this._targetWalletUrl);
