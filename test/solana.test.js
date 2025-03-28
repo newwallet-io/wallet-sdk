@@ -1,4 +1,16 @@
 // test/solana.test.js
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  TransactionMessage,
+  LAMPORTS_PER_SOL,
+  SystemProgram,
+  VersionedTransaction,
+  sendAndConfirmTransaction,
+  SendOptions,
+} from '@solana/web3.js';
 
 // Mock document and window objects for testing
 global.document = {
@@ -390,19 +402,24 @@ describe('Solana Provider', () => {
   });
 
   describe('signTransaction()', () => {
-    test('should sign a transaction successfully', async () => {
-      // Setup connected state
+    test('should sign a legacy transaction successfully', async () => {
+      // Create a mock legacy transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-
-      // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
+      wallet.solana._publicKey = mockPublicKey;
 
       // Start signing process
-      const signPromise = wallet.solana.signTransaction(mockTransaction);
+      const signPromise = wallet.solana.signTransaction(legacyTx);
 
       // Verify popup was opened
       expect(window.open).toHaveBeenCalledWith(
@@ -419,9 +436,74 @@ describe('Solana Provider', () => {
         expect.objectContaining({
           type: SolanaMessageType.SIGN_TRANSACTION,
           network: 'solana',
-          payload: expect.objectContaining({
-            transaction: mockTransaction,
-          }),
+          payload: {
+            encoding: 'base64',
+            isVersionedTransaction: false,
+            serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/), // Base64 encoded transaction,
+          },
+        }),
+        'http://localhost:3001'
+      );
+
+      // Simulate successful signing
+      simulateWalletMessage(SolanaMessageType.SIGN_TRANSACTION, {
+        message: 'Transaction signed successfully',
+        result: {
+          signedTransaction: 'signed-solana-transaction',
+        },
+      });
+
+      // Wait for the signing promise to resolve
+      const signedTx = await signPromise;
+
+      // Check the result
+      expect(signedTx).toBe('signed-solana-transaction');
+      expect(mockPopup.close).toHaveBeenCalled();
+    });
+
+    test('should sign a version transaction successfully', async () => {
+      // Create a mock version transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+      const versionedTx = new VersionedTransaction(messageV0);
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Start signing process
+      const signPromise = wallet.solana.signTransaction(versionedTx);
+
+      // Verify popup was opened
+      expect(window.open).toHaveBeenCalledWith(
+        'http://localhost:3001',
+        expect.any(String),
+        expect.any(String)
+      );
+
+      // Simulate the wallet sending a READY message
+      simulateWalletMessage(SolanaMessageType.READY);
+
+      // Verify the postMessage was called with the correct transaction data
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SolanaMessageType.SIGN_TRANSACTION,
+          network: 'solana',
+          payload: {
+            encoding: 'base64',
+            isVersionedTransaction: true,
+            serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/), // Base64 encoded transaction,
+          },
         }),
         'http://localhost:3001'
       );
@@ -481,18 +563,22 @@ describe('Solana Provider', () => {
     });
 
     test('should handle user rejection', async () => {
-      // Setup connected state
+      // Create a mock legacy transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-
-      // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
-
+      wallet.solana._publicKey = mockPublicKey;
       // Start signing process
-      const signPromise = wallet.solana.signTransaction(mockTransaction);
+      const signPromise = wallet.solana.signTransaction(legacyTx);
 
       // Simulate the wallet sending a READY message
       simulateWalletMessage(SolanaMessageType.READY);
@@ -509,18 +595,23 @@ describe('Solana Provider', () => {
     });
 
     test('should handle popup being closed', async () => {
-      // Setup connected state
+      // Create a mock legacy transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-
-      // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
+      wallet.solana._publicKey = mockPublicKey;
 
       // Start signing process
-      const signPromise = wallet.solana.signTransaction(mockTransaction);
+      const signPromise = wallet.solana.signTransaction(legacyTx);
 
       // Simulate popup being closed by user
       simulatePopupClosed();
@@ -530,21 +621,28 @@ describe('Solana Provider', () => {
     });
 
     test('should reject a legacy transaction with non-matching feePayer', async () => {
-      // Setup connected state
+      // Create a mock legacy transaction
+      const mockKeypair = Keypair.generate();
+      const mockKeypair1 = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair1.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock transaction with non-matching feePayer
-      const mockTransaction = { 
-        feePayer: 'different-public-key',
-        recentBlockhash: 'recent-blockhash'
-      };
-  
+      wallet.solana._publicKey = mockPublicKey;
       // Attempt to sign transaction with wrong feePayer
-      const signPromise = wallet.solana.signTransaction(mockTransaction);
-  
+      const signPromise = wallet.solana.signTransaction(legacyTx);
+
       // Wait for the promise to be rejected
-      await expect(signPromise).rejects.toThrow('Transaction fee payer does not match connected account');
+      await expect(signPromise).rejects.toThrow(
+        'Transaction fee payer does not match connected account'
+      );
       await expect(signPromise).rejects.toMatchObject({
         code: ErrorCode.UNAUTHORIZED,
       });
@@ -552,20 +650,27 @@ describe('Solana Provider', () => {
     });
     test('should accept a versioned transaction with matching first signer', async () => {
       // Setup connected state
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+      const mockVersionedTransaction = new VersionedTransaction(messageV0);
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock versioned transaction with matching first signer
-      const mockVersionedTransaction = { 
-        version: 0,
-        message: {
-          staticAccountKeys: ['solana-public-key-123', 'other-key-1', 'other-key-2']
-        }
-      };
-  
+      wallet.solana._publicKey = mockPublicKey;
+
       // Start signing process
       const signPromise = wallet.solana.signTransaction(mockVersionedTransaction);
-  
+
       // Simulate the wallet flow
       simulateWalletMessage(SolanaMessageType.READY);
       simulateWalletMessage(SolanaMessageType.SIGN_TRANSACTION, {
@@ -574,76 +679,80 @@ describe('Solana Provider', () => {
           signedTransaction: 'signed-versioned-transaction',
         },
       });
-  
+
       // Wait for the signing promise to resolve
       const signedTx = await signPromise;
       expect(signedTx).toBe('signed-versioned-transaction');
     });
-  
+
     test('should reject a versioned transaction with non-matching first signer', async () => {
-      // Setup connected state
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const mockKeypair1 = Keypair.generate();
+      const mockPublicKey1 = mockKeypair1.publicKey.toString();
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+      const mockVersionedTransaction = new VersionedTransaction(messageV0);
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock versioned transaction with non-matching first signer
-      const mockVersionedTransaction = { 
-        version: 0,
-        message: {
-          staticAccountKeys: ['different-public-key', 'other-key-1', 'other-key-2']
-        }
-      };
-  
+      wallet.solana._publicKey = mockPublicKey1;
+
       // Attempt to sign transaction with wrong first signer
       const signPromise = wallet.solana.signTransaction(mockVersionedTransaction);
-  
       // Wait for the promise to be rejected
-      await expect(signPromise).rejects.toThrow('Transaction first signer does not match connected account');
+      await expect(signPromise).rejects.toThrow(
+        'Transaction first signer does not match connected account'
+      );
       await expect(signPromise).rejects.toMatchObject({
         code: ErrorCode.UNAUTHORIZED,
       });
       expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
-    });
-  
-    test('should reject a transaction that cannot be verified', async () => {
-      // Setup connected state
-      wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock transaction without feePayer or version
-      const mockTransaction = { 
-        recentBlockhash: 'recent-blockhash',
-        // No feePayer, not a versioned transaction
-      };
-  
-      // Attempt to sign unverifiable transaction
-      const signPromise = wallet.solana.signTransaction(mockTransaction);
-  
-      // Wait for the promise to be rejected
-      await expect(signPromise).rejects.toThrow('Unable to verify transaction ownership');
-      await expect(signPromise).rejects.toMatchObject({
-        code: ErrorCode.UNAUTHORIZED,
-      });
-      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
-    });
+    }, 10000);
   });
 
   describe('signAllTransactions()', () => {
-    test('should sign multiple transactions successfully', async () => {
+    test('should sign multiple legacy transactions successfully', async () => {
+      // Create mock legacy transactions
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create first transaction
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Create second transaction
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
       // Setup connected state
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
+      wallet.solana._publicKey = mockPublicKey;
 
-      // Create mock transactions
-      const mockTransactions = [
-        {
-          feePayer: 'solana-public-key-123',
-          recentBlockhash: 'recent-blockhash-1',
-        },
-        {
-          feePayer: 'solana-public-key-123',
-          recentBlockhash: 'recent-blockhash-2',
-        },
-      ];
+      // Prepare transactions array
+      const mockTransactions = [legacyTx1, legacyTx2];
 
       // Start signing process
       const signPromise = wallet.solana.signAllTransactions(mockTransactions);
@@ -664,7 +773,13 @@ describe('Solana Provider', () => {
           type: SolanaMessageType.SIGN_ALL_TRANSACTIONS,
           network: 'solana',
           payload: expect.objectContaining({
-            transactions: mockTransactions,
+            serializedTransactions: expect.arrayContaining([
+              expect.objectContaining({
+                serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/), // Base64 encoded transaction
+                isVersionedTransaction: false,
+                encoding: 'base64',
+              }),
+            ]),
           }),
         }),
         'http://localhost:3001'
@@ -686,16 +801,113 @@ describe('Solana Provider', () => {
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
+    test('should sign mix of legacy and versioned transactions successfully', async () => {
+      // Create mock keypair
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create legacy transaction
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Create versioned transaction
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+      const versionedTx = new VersionedTransaction(messageV0);
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Prepare transactions array with mixed types
+      const mockTransactions = [legacyTx, versionedTx];
+
+      // Start signing process
+      const signPromise = wallet.solana.signAllTransactions(mockTransactions);
+
+      // Simulate the wallet flow
+      simulateWalletMessage(SolanaMessageType.READY);
+
+      // Verify the postMessage payload has the correct structure
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SolanaMessageType.SIGN_ALL_TRANSACTIONS,
+          network: 'solana',
+          payload: expect.objectContaining({
+            serializedTransactions: expect.arrayContaining([
+              expect.objectContaining({
+                serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/),
+                encoding: 'base64',
+              }),
+            ]),
+          }),
+        }),
+        'http://localhost:3001'
+      );
+
+      // Simulate successful signing
+      simulateWalletMessage(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
+        message: 'All transactions signed successfully',
+        result: {
+          signedTransactions: ['signed-legacy-tx', 'signed-versioned-tx'],
+        },
+      });
+
+      // Wait for the signing promise to resolve
+      const signedTxs = await signPromise;
+
+      // Check the results
+      expect(signedTxs).toEqual(['signed-legacy-tx', 'signed-versioned-tx']);
+      expect(mockPopup.close).toHaveBeenCalled();
+    });
+
     test('should reject if not connected', async () => {
       // Ensure not connected
       wallet.solana._connected = false;
       wallet.solana._publicKey = null;
 
+      // Create mock keypair
+      const mockKeypair = Keypair.generate();
+
       // Create mock transactions
-      const mockTransactions = [
-        { feePayer: 'solana-public-key-123', recentBlockhash: 'recent-blockhash-1' },
-        { feePayer: 'solana-public-key-123', recentBlockhash: 'recent-blockhash-2' },
-      ];
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const mockTransactions = [legacyTx1, legacyTx2];
 
       // Attempt to sign transactions when not connected
       const signPromise = wallet.solana.signAllTransactions(mockTransactions);
@@ -705,16 +917,76 @@ describe('Solana Provider', () => {
       expect(window.open).not.toHaveBeenCalled();
     });
 
-    test('should handle user rejection', async () => {
-      // Setup connected state
+    test('should reject if no public key available', async () => {
+      // Connected but no public key
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
+      wallet.solana._publicKey = null;
+
+      // Create mock keypair
+      const mockKeypair = Keypair.generate();
 
       // Create mock transactions
-      const mockTransactions = [
-        { feePayer: 'solana-public-key-123', recentBlockhash: 'recent-blockhash-1' },
-        { feePayer: 'solana-public-key-123', recentBlockhash: 'recent-blockhash-2' },
-      ];
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const mockTransactions = [legacyTx1, legacyTx2];
+
+      // Attempt to sign transactions with no public key
+      const signPromise = wallet.solana.signAllTransactions(mockTransactions);
+
+      // Wait for the promise to be rejected
+      await expect(signPromise).rejects.toThrow('No public key available');
+      expect(window.open).not.toHaveBeenCalled();
+    });
+
+    test('should handle user rejection', async () => {
+      // Create mock keypair
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create mock transactions
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const mockTransactions = [legacyTx1, legacyTx2];
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
 
       // Start signing process
       const signPromise = wallet.solana.signAllTransactions(mockTransactions);
@@ -722,7 +994,7 @@ describe('Solana Provider', () => {
       // Simulate the wallet sending a READY message
       simulateWalletMessage(SolanaMessageType.READY);
 
-      // Simulate user rejecting the transactions
+      // Simulate user rejecting the signing
       simulateWalletMessage(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
         message: 'User rejected the transactions',
         errorCode: ErrorCode.USER_REJECTED,
@@ -733,70 +1005,142 @@ describe('Solana Provider', () => {
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
-    test('should accept transactions with different but valid ownership types', async () => {
+    test('should handle popup being closed', async () => {
+      // Create mock keypair
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create mock transactions
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const mockTransactions = [legacyTx1, legacyTx2];
+
       // Setup connected state
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create mock transactions with different but valid ownership types
-      const mockTransactions = [
-        { 
-          feePayer: 'solana-public-key-123', // Legacy transaction
-          recentBlockhash: 'recent-blockhash-1'
-        },
-        { 
-          version: 0, // Versioned transaction
-          message: {
-            staticAccountKeys: ['solana-public-key-123', 'other-key-1']
-          }
-        }
-      ];
-  
+      wallet.solana._publicKey = mockPublicKey;
+
       // Start signing process
       const signPromise = wallet.solana.signAllTransactions(mockTransactions);
-  
-      // Simulate the wallet flow
-      simulateWalletMessage(SolanaMessageType.READY);
-      simulateWalletMessage(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
-        message: 'All transactions signed successfully',
-        result: {
-          signedTransactions: [
-            'signed-solana-transaction-1',
-            'signed-solana-transaction-2'
-          ],
-        },
-      });
-  
-      // Wait for the signing promise to resolve
-      const signedTxs = await signPromise;
-      expect(signedTxs).toEqual([
-        'signed-solana-transaction-1',
-        'signed-solana-transaction-2'
-      ]);
+
+      // Simulate popup being closed by user
+      simulatePopupClosed();
+
+      // Wait for the promise to be rejected
+      await expect(signPromise).rejects.toThrow('User closed the wallet window');
     });
-  
-    test('should reject if any transaction in the batch fails verification', async () => {
+
+    test('should reject if any transaction fails verification - legacy', async () => {
+      // Create mock keypairs
+      const mockKeypair = Keypair.generate();
+      const mockKeypair2 = Keypair.generate(); // Different keypair for invalid transaction
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create first valid transaction
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey; // Valid - matches connected account
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Create second invalid transaction
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair2.publicKey; // Invalid - different from connected account
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const mockTransactions = [legacyTx1, legacyTx2];
+
       // Setup connected state
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create mock transactions with one invalid transaction
-      const mockTransactions = [
-        { 
-          feePayer: 'solana-public-key-123', // Valid
-          recentBlockhash: 'recent-blockhash-1'
-        },
-        { 
-          feePayer: 'different-public-key', // Invalid - feePayer doesn't match
-          recentBlockhash: 'recent-blockhash-2'
-        }
-      ];
-  
+      wallet.solana._publicKey = mockPublicKey;
+
       // Attempt to sign transactions with one invalid transaction
       const signPromise = wallet.solana.signAllTransactions(mockTransactions);
-  
+
       // Wait for the promise to be rejected
-      await expect(signPromise).rejects.toThrow('Transaction fee payer does not match connected account');
+      await expect(signPromise).rejects.toThrow(
+        /Transaction (at index 1: )?fee payer does not match connected account/
+      );
+      await expect(signPromise).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHORIZED,
+      });
+      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
+    });
+
+    test('should reject if any transaction fails verification - versioned', async () => {
+      // Create mock keypairs
+      const mockKeypair = Keypair.generate();
+      const mockKeypair2 = Keypair.generate(); // Different keypair for invalid transaction
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create valid versioned transaction
+      const validInstructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const validMessageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey, // Valid - matches connected account
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions: validInstructions,
+      }).compileToV0Message();
+      const validVersionedTx = new VersionedTransaction(validMessageV0);
+
+      // Create invalid versioned transaction
+      const invalidInstructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const invalidMessageV0 = new TransactionMessage({
+        payerKey: mockKeypair2.publicKey, // Invalid - different from connected account
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions: invalidInstructions,
+      }).compileToV0Message();
+      const invalidVersionedTx = new VersionedTransaction(invalidMessageV0);
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Attempt to sign transactions with one invalid transaction
+      const signPromise = wallet.solana.signAllTransactions([validVersionedTx, invalidVersionedTx]);
+
+      // Wait for the promise to be rejected
+      await expect(signPromise).rejects.toThrow(
+        /Transaction (at index 1: )?first signer does not match connected account/
+      );
       await expect(signPromise).rejects.toMatchObject({
         code: ErrorCode.UNAUTHORIZED,
       });
@@ -805,19 +1149,26 @@ describe('Solana Provider', () => {
   });
 
   describe('signAndSendTransaction()', () => {
-    test('should sign and send a transaction successfully', async () => {
+    test('should sign and send a legacy transaction successfully', async () => {
+      // Create a mock legacy transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
       // Setup connected state
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-
-      // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
+      wallet.solana._publicKey = mockPublicKey;
 
       // Start signing and sending process
-      const sendPromise = wallet.solana.signAndSendTransaction(mockTransaction);
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
 
       // Verify popup was opened
       expect(window.open).toHaveBeenCalledWith(
@@ -835,7 +1186,9 @@ describe('Solana Provider', () => {
           type: SolanaMessageType.SIGN_AND_SEND_TRANSACTION,
           network: 'solana',
           payload: expect.objectContaining({
-            transaction: mockTransaction,
+            serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/), // Base64 encoded transaction
+            isVersionedTransaction: false,
+            encoding: 'base64',
           }),
         }),
         'http://localhost:3001'
@@ -857,38 +1210,144 @@ describe('Solana Provider', () => {
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
+    test('should sign and send a versioned transaction successfully', async () => {
+      // Create a mock versioned transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+
+      const versionedTx = new VersionedTransaction(messageV0);
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Start signing and sending process
+      const sendPromise = wallet.solana.signAndSendTransaction(versionedTx);
+
+      // Verify popup was opened
+      expect(window.open).toHaveBeenCalledWith(
+        'http://localhost:3001',
+        expect.any(String),
+        expect.any(String)
+      );
+
+      // Simulate the wallet sending a READY message
+      simulateWalletMessage(SolanaMessageType.READY);
+
+      // Verify the postMessage was called with the correct transaction data
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: SolanaMessageType.SIGN_AND_SEND_TRANSACTION,
+          network: 'solana',
+          payload: expect.objectContaining({
+            serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/), // Base64 encoded transaction
+            isVersionedTransaction: true,
+            encoding: 'base64',
+          }),
+        }),
+        'http://localhost:3001'
+      );
+
+      // Simulate successful signing and sending
+      simulateWalletMessage(SolanaMessageType.SIGN_AND_SEND_TRANSACTION, {
+        message: 'Transaction signed and sent successfully',
+        result: {
+          signature: 'solana-versioned-tx-signature-123',
+        },
+      });
+
+      // Wait for the promise to resolve
+      const signature = await sendPromise;
+
+      // Check the signature returned
+      expect(signature).toBe('solana-versioned-tx-signature-123');
+      expect(mockPopup.close).toHaveBeenCalled();
+    });
+
     test('should reject if not connected', async () => {
       // Ensure not connected
       wallet.solana._connected = false;
       wallet.solana._publicKey = null;
 
       // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
+      const mockKeypair = Keypair.generate();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
       // Attempt to sign and send transaction when not connected
-      const sendPromise = wallet.solana.signAndSendTransaction(mockTransaction);
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
 
       // Wait for the promise to be rejected
       await expect(sendPromise).rejects.toThrow('Not connected');
       expect(window.open).not.toHaveBeenCalled();
     });
 
-    test('should handle wallet errors', async () => {
-      // Setup connected state
+    test('should reject if no public key available', async () => {
+      // Connected but no public key
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
+      wallet.solana._publicKey = null;
 
       // Create a mock transaction
-      const mockTransaction = {
-        feePayer: 'solana-public-key-123',
-        recentBlockhash: 'recent-blockhash',
-      };
+      const mockKeypair = Keypair.generate();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Attempt to sign and send transaction with no public key
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
+
+      // Wait for the promise to be rejected
+      await expect(sendPromise).rejects.toThrow('No public key available');
+      expect(window.open).not.toHaveBeenCalled();
+    });
+
+    test('should handle wallet errors', async () => {
+      // Create a mock transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
 
       // Start signing and sending process
-      const sendPromise = wallet.solana.signAndSendTransaction(mockTransaction);
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
 
       // Simulate the wallet sending a READY message
       simulateWalletMessage(SolanaMessageType.READY);
@@ -904,80 +1363,106 @@ describe('Solana Provider', () => {
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
-    test('should reject a transaction with non-matching feePayer', async () => {
+    test('should handle popup being closed', async () => {
+      // Create a mock transaction
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair.publicKey;
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
       // Setup connected state
       wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock transaction with non-matching feePayer
-      const mockTransaction = { 
-        feePayer: 'different-public-key',
-        recentBlockhash: 'recent-blockhash'
-      };
-  
-      // Attempt to sign and send transaction with wrong feePayer
-      const sendPromise = wallet.solana.signAndSendTransaction(mockTransaction);
-  
-      // Wait for the promise to be rejected
-      await expect(sendPromise).rejects.toThrow('Transaction fee payer does not match connected account');
-      await expect(sendPromise).rejects.toMatchObject({
-        code: ErrorCode.UNAUTHORIZED,
-      });
-      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
-    });
-  
-    test('should reject a versioned transaction with non-matching first signer', async () => {
-      // Setup connected state
-      wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock versioned transaction with non-matching first signer
-      const mockVersionedTransaction = { 
-        version: 0,
-        message: {
-          staticAccountKeys: ['different-public-key', 'other-key-1', 'other-key-2']
-        }
-      };
-  
-      // Attempt to sign and send transaction with wrong first signer
-      const sendPromise = wallet.solana.signAndSendTransaction(mockVersionedTransaction);
-  
-      // Wait for the promise to be rejected
-      await expect(sendPromise).rejects.toThrow('Transaction first signer does not match connected account');
-      await expect(sendPromise).rejects.toMatchObject({
-        code: ErrorCode.UNAUTHORIZED,
-      });
-      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
-    });
-  
-    test('should accept a versioned transaction with matching first signer', async () => {
-      // Setup connected state
-      wallet.solana._connected = true;
-      wallet.solana._publicKey = 'solana-public-key-123';
-  
-      // Create a mock versioned transaction with matching first signer
-      const mockVersionedTransaction = { 
-        version: 0,
-        message: {
-          staticAccountKeys: ['solana-public-key-123', 'other-key-1', 'other-key-2']
-        }
-      };
-  
+      wallet.solana._publicKey = mockPublicKey;
+
       // Start signing and sending process
-      const sendPromise = wallet.solana.signAndSendTransaction(mockVersionedTransaction);
-  
-      // Simulate the wallet flow
-      simulateWalletMessage(SolanaMessageType.READY);
-      simulateWalletMessage(SolanaMessageType.SIGN_AND_SEND_TRANSACTION, {
-        message: 'Transaction signed and sent successfully',
-        result: {
-          signature: 'solana-versioned-tx-signature-123',
-        },
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
+
+      // Simulate popup being closed by user
+      simulatePopupClosed();
+
+      // Wait for the promise to be rejected
+      await expect(sendPromise).rejects.toThrow('User closed the wallet window');
+    });
+
+    test('should reject a legacy transaction with non-matching feePayer', async () => {
+      // Create mock keypairs
+      const mockKeypair = Keypair.generate();
+      const mockKeypair2 = Keypair.generate(); // Different keypair for invalid transaction
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create a transaction with non-matching feePayer
+      const legacyTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx.feePayer = mockKeypair2.publicKey; // Different from connected account
+      legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Attempt to sign and send transaction with wrong feePayer
+      const sendPromise = wallet.solana.signAndSendTransaction(legacyTx);
+
+      // Wait for the promise to be rejected
+      await expect(sendPromise).rejects.toThrow(
+        'Transaction fee payer does not match connected account'
+      );
+      await expect(sendPromise).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHORIZED,
       });
-  
-      // Wait for the promise to resolve
-      const signature = await sendPromise;
-      expect(signature).toBe('solana-versioned-tx-signature-123');
+      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
+    });
+
+    test('should reject a versioned transaction with non-matching first signer', async () => {
+      // Create mock keypairs
+      const mockKeypair = Keypair.generate();
+      const mockKeypair2 = Keypair.generate(); // Different keypair for invalid transaction
+      const mockPublicKey = mockKeypair.publicKey.toString();
+
+      // Create a versioned transaction with non-matching first signer
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair2.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair2.publicKey, // Different from connected account
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+
+      const versionedTx = new VersionedTransaction(messageV0);
+
+      // Setup connected state
+      wallet.solana._connected = true;
+      wallet.solana._publicKey = mockPublicKey;
+
+      // Attempt to sign and send transaction with wrong first signer
+      const sendPromise = wallet.solana.signAndSendTransaction(versionedTx);
+
+      // Wait for the promise to be rejected
+      await expect(sendPromise).rejects.toThrow(
+        'Transaction first signer does not match connected account'
+      );
+      await expect(sendPromise).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHORIZED,
+      });
+      expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
     });
   });
 

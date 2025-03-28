@@ -25,6 +25,19 @@ export default {
       exports: 'named' // Change from 'default' to 'named'
     }
   ],
+  external: [
+    '@solana/web3.js',
+    'ethers',
+    'bn.js',
+    'bs58',
+    'crypto-js',
+    'bip39',
+    'elliptic',
+    'tweetnacl',
+    'rpc-websockets', // Add this
+    'buffer',
+    'tr46'
+  ],
   plugins: [
     typescript({
       tsconfig: './tsconfig.json'

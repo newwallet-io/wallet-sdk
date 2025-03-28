@@ -7,6 +7,16 @@ import {
   ProviderError,
 } from '../types';
 import { openPopup } from '../utils';
+import { serializeSolanaTransaction } from '../utils/serialization';
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  VersionedTransaction,
+  sendAndConfirmTransaction,
+  SendOptions,
+} from '@solana/web3.js';
 
 export class SolanaProvider {
   private _targetWalletUrl: string;
@@ -208,7 +218,7 @@ export class SolanaProvider {
    * @param transaction The transaction to verify (Transaction or VersionedTransaction)
    * @throws ProviderError if the transaction doesn't belong to the connected account
    */
-  private _verifyTransactionOwnership(transaction: any): void {
+  private _verifyTransactionOwnership(transaction: Transaction | VersionedTransaction): void {
     if (!this._publicKey) {
       throw new ProviderError(
         ErrorCode.UNAUTHORIZED,
@@ -216,44 +226,37 @@ export class SolanaProvider {
       );
     }
 
-    // Simple case: check if the feePayer matches our public key
-    if (transaction.feePayer) {
-      const feePayer =
-        typeof transaction.feePayer === 'string'
-          ? transaction.feePayer
-          : transaction.feePayer.toString();
-
-      if (feePayer !== this._publicKey) {
-        throw new ProviderError(
-          ErrorCode.UNAUTHORIZED,
-          'Transaction fee payer does not match connected account.'
-        );
+    if (transaction instanceof Transaction) {
+      // For legacy Transaction
+      if (transaction.feePayer) {
+        const feePayer = transaction.feePayer.toString();
+        if (feePayer !== this._publicKey) {
+          throw new ProviderError(
+            ErrorCode.UNAUTHORIZED,
+            'Transaction fee payer does not match connected account.'
+          );
+        }
+        return;
       }
-      return;
+    } else if (transaction instanceof VersionedTransaction) {
+      // For VersionedTransaction
+      if (
+        transaction.message &&
+        transaction.message.staticAccountKeys &&
+        transaction.message.staticAccountKeys.length > 0
+      ) {
+        const firstKey = transaction.message.staticAccountKeys[0].toString();
+        if (firstKey !== this._publicKey) {
+          throw new ProviderError(
+            ErrorCode.UNAUTHORIZED,
+            'Transaction first signer does not match connected account.'
+          );
+        }
+        return;
+      }
     }
 
-    // For VersionedTransaction with message
-    if (
-      transaction.version !== undefined &&
-      transaction.message &&
-      transaction.message.staticAccountKeys &&
-      transaction.message.staticAccountKeys.length > 0
-    ) {
-      const firstKey =
-        typeof transaction.message.staticAccountKeys[0] === 'string'
-          ? transaction.message.staticAccountKeys[0]
-          : transaction.message.staticAccountKeys[0].toString();
-
-      if (firstKey !== this._publicKey) {
-        throw new ProviderError(
-          ErrorCode.UNAUTHORIZED,
-          'Transaction first signer does not match connected account.'
-        );
-      }
-      return;
-    }
-
-    // We couldn't verify ownership based on common transaction properties
+    // If we can't verify transaction ownership
     throw new ProviderError(
       ErrorCode.UNAUTHORIZED,
       'Unable to verify transaction ownership. Please ensure the transaction is properly constructed.'
@@ -265,11 +268,10 @@ export class SolanaProvider {
    * @param transaction The transaction to sign
    * @returns A promise that resolves to the signed transaction
    */
-  async signTransaction(transaction: any): Promise<any> {
+  async signTransaction(transaction: Transaction | VersionedTransaction): Promise<any> {
     if (!this._connected) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
-
     // Verify transaction ownership
     this._verifyTransactionOwnership(transaction);
 
@@ -281,23 +283,29 @@ export class SolanaProvider {
       }
 
       let posted = false;
-
       const handleMessage = (event: MessageEvent<MessageResponse>) => {
         const { data, origin } = event;
-
         if (
           data.type === SolanaMessageType.READY &&
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          // For simplicity, we'll assume the transaction is already serialized
-          // In a real implementation, you might need to handle the serialization here
-          const request = this._buildRequest(SolanaMessageType.SIGN_TRANSACTION, {
-            transaction: transaction,
-          });
-
-          popup.postMessage(request, this._targetWalletOrigin);
-          posted = true;
+          try {
+            // Serialize the transaction
+            const { serializedTransaction, isVersionedTransaction, encoding } =
+              serializeSolanaTransaction(transaction);
+            const request = this._buildRequest(SolanaMessageType.SIGN_TRANSACTION, {
+              serializedTransaction,
+              isVersionedTransaction,
+              encoding,
+            });
+            popup.postMessage(request, this._targetWalletOrigin);
+            posted = true;
+          } catch (err) {
+            cleanup();
+            popup.close();
+            reject(err);
+          }
         }
 
         if (
@@ -374,12 +382,31 @@ export class SolanaProvider {
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          const request = this._buildRequest(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
-            transactions: transactions,
-          });
+          try {
+            // Prepare transactions for transfer in a single try block
+            const serializedTransactions = transactions.map((tx, index) => {
+              const { serializedTransaction, isVersionedTransaction, encoding } =
+                serializeSolanaTransaction(tx);
 
-          popup.postMessage(request, this._targetWalletOrigin);
-          posted = true;
+              return {
+                serializedTransaction,
+                isVersionedTransaction,
+                encoding,
+                index,
+              };
+            });
+
+            const request = this._buildRequest(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
+              serializedTransactions,
+            });
+
+            popup.postMessage(request, this._targetWalletOrigin);
+            posted = true;
+          } catch (err) {
+            cleanup();
+            popup.close();
+            reject(err);
+          }
         }
 
         if (
@@ -421,11 +448,10 @@ export class SolanaProvider {
    * @param transaction The transaction to sign and send
    * @returns A promise that resolves to the transaction signature
    */
-  async signAndSendTransaction(transaction: any): Promise<string> {
+  async signAndSendTransaction(transaction: Transaction | VersionedTransaction): Promise<string> {
     if (!this._connected) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
-
     // Verify transaction ownership
     this._verifyTransactionOwnership(transaction);
 
@@ -437,7 +463,6 @@ export class SolanaProvider {
       }
 
       let posted = false;
-
       const handleMessage = (event: MessageEvent<MessageResponse>) => {
         const { data, origin } = event;
 
@@ -446,12 +471,23 @@ export class SolanaProvider {
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          const request = this._buildRequest(SolanaMessageType.SIGN_AND_SEND_TRANSACTION, {
-            transaction: transaction,
-          });
+          try {
+            // Serialize the transaction with the same format as signTransaction
+            const { serializedTransaction, isVersionedTransaction, encoding } =
+              serializeSolanaTransaction(transaction);
 
-          popup.postMessage(request, this._targetWalletOrigin);
-          posted = true;
+            const request = this._buildRequest(SolanaMessageType.SIGN_AND_SEND_TRANSACTION, {
+              serializedTransaction,
+              isVersionedTransaction,
+              encoding,
+            });
+            popup.postMessage(request, this._targetWalletOrigin);
+            posted = true;
+          } catch (err) {
+            cleanup();
+            popup.close();
+            reject(err);
+          }
         }
 
         if (
@@ -460,7 +496,6 @@ export class SolanaProvider {
         ) {
           cleanup();
           popup.close();
-
           if (data.payload.success) {
             resolve(data.payload.result.signature);
           } else {

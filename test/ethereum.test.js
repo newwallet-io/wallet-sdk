@@ -575,7 +575,10 @@ describe('NewWallet SDK', () => {
         expect.objectContaining({
           type: 'ETH_SIGN_TRANSACTION',
           network: 'ethereum',
-          payload: txParams,
+          payload: {
+            encoding: 'json',
+            serializedTransaction: JSON.stringify(txParams),
+          },
         }),
         'http://localhost:3001'
       );

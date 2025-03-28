@@ -7,6 +7,8 @@ import {
   ProviderError,
 } from '../types';
 import { openPopup } from '../utils';
+import { serializeEthereumTransaction } from '../utils/serialization';
+import { ethers } from 'ethers';
 
 export class EthereumProvider {
   private _targetWalletUrl: string;
@@ -164,7 +166,10 @@ export class EthereumProvider {
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          const request = this._buildRequest(EthereumMessageType.SIGN_MESSAGE, { message, from });
+          const request = this._buildRequest(EthereumMessageType.SIGN_MESSAGE, {
+            message: message,
+            encoding: 'json',
+          });
           popup.postMessage(request, this._targetWalletOrigin);
           posted = true;
         }
@@ -200,12 +205,12 @@ export class EthereumProvider {
     });
   }
 
-  private async _signTransaction(transactionRequest: any): Promise<string> {
+  private async _signTransaction(transactionRequest: ethers.TransactionRequest): Promise<string> {
     if (!this._connected) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
 
-    if (!transactionRequest.from || !this._accounts.includes(transactionRequest.from)) {
+    if (!transactionRequest.from || !this._accounts.includes(transactionRequest.from.toString())) {
       throw new ProviderError(
         ErrorCode.UNAUTHORIZED,
         'From address not connected. Please connect the correct account.'
@@ -229,10 +234,12 @@ export class EthereumProvider {
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          const request = this._buildRequest(
-            EthereumMessageType.SIGN_TRANSACTION,
-            transactionRequest
-          );
+          const { serializedTransaction, encoding } =
+            serializeEthereumTransaction(transactionRequest);
+          const request = this._buildRequest(EthereumMessageType.SIGN_TRANSACTION, {
+            serializedTransaction,
+            encoding,
+          });
           popup.postMessage(request, this._targetWalletOrigin);
           posted = true;
         }
@@ -273,12 +280,12 @@ export class EthereumProvider {
     });
   }
 
-  private async _sendTransaction(transactionRequest: any): Promise<string> {
+  private async _sendTransaction(transactionRequest: ethers.TransactionRequest): Promise<string> {
     if (!this._connected) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
 
-    if (!transactionRequest.from || !this._accounts.includes(transactionRequest.from)) {
+    if (!transactionRequest.from || !this._accounts.includes(transactionRequest.from.toString())) {
       throw new ProviderError(
         ErrorCode.UNAUTHORIZED,
         'From address not connected. Please connect the correct account.'
@@ -302,10 +309,12 @@ export class EthereumProvider {
           origin === this._targetWalletOrigin &&
           !posted
         ) {
-          const request = this._buildRequest(
-            EthereumMessageType.SIGN_TRANSACTION,
-            transactionRequest
-          );
+          const { serializedTransaction, encoding } =
+            serializeEthereumTransaction(transactionRequest);
+          const request = this._buildRequest(EthereumMessageType.SIGN_TRANSACTION, {
+            serializedTransaction,
+            encoding,
+          });
           popup.postMessage(request, this._targetWalletOrigin);
           posted = true;
         }
