@@ -11,17 +11,23 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rollup -c && npm run copy-sdk",
-    "copy-sdk": "mkdir -p examples/demo-dapp/libs && cp dist/index.umd.js examples/demo-dapp/libs/index.umd.js",
+    "build": "rollup -c",
     "dev": "rollup -c -w",
     "test": "jest",
     "clean": "rm -rf dist",
-    "serve:wallet": "http-server examples/demo-wallet -p 3001  -o /index.html",
-    "serve:dapp": "http-server examples/demo-dapp -p 3002 -o /index.html",
-    "demo": "concurrently \"npm run serve:wallet\" \"npm run serve:dapp\"",
+    "serve:wallet": "cd examples/demo-wallet && yarn start",
+    "serve:dapp": "cd examples/demo-dapp && PORT=3002 npm start",
+    "demo": "concurrently \"yarn serve:wallet\" \"yarn serve:dapp\"",
+    "install:demos": "yarn install:dapp && yarn install:wallet",
+    "install:dapp": "cd examples/demo-dapp && yarn install",
+    "install:wallet": "cd examples/demo-wallet && yarn install",
+    "build:dapp": "cd examples/demo-dapp && yarn build",
+    "build:wallet": "cd examples/demo-wallet && yarn build",
+    "build:demos": "yarn build:dapp && yarn build:wallet",
+    "link:sdk": "yarn link && cd examples/demo-dapp && yarn link @newwallet/wallet-sdk",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\"",
     "format:check": "prettier --check \"src/**/*.{ts,js}\" \"test/**/*.{ts,js}\"",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "yarn clean && yarn build"
   },
   "keywords": [
     "newwallet",
@@ -67,5 +73,8 @@
   },
   "engines": {
     "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3"
   }
 }

@@ -9,13 +9,8 @@ import {
 import { openPopup } from '../utils';
 import { serializeSolanaTransaction } from '../utils/serialization';
 import {
-  Connection,
-  Keypair,
-  PublicKey,
   Transaction,
   VersionedTransaction,
-  sendAndConfirmTransaction,
-  SendOptions,
 } from '@solana/web3.js';
 
 export class SolanaProvider {
@@ -218,7 +213,7 @@ export class SolanaProvider {
    * @param transaction The transaction to verify (Transaction or VersionedTransaction)
    * @throws ProviderError if the transaction doesn't belong to the connected account
    */
-  private _verifyTransactionOwnership(transaction: Transaction | VersionedTransaction): void {
+  private _verifyTransactionOwnership(transaction: any): void {
     if (!this._publicKey) {
       throw new ProviderError(
         ErrorCode.UNAUTHORIZED,
@@ -226,26 +221,33 @@ export class SolanaProvider {
       );
     }
 
-    if (transaction instanceof Transaction) {
-      // For legacy Transaction
-      if (transaction.feePayer) {
-        const feePayer = transaction.feePayer.toString();
-        if (feePayer !== this._publicKey) {
-          throw new ProviderError(
-            ErrorCode.UNAUTHORIZED,
-            'Transaction fee payer does not match connected account.'
-          );
-        }
-        return;
+    // Handle LegacyTransaction
+    if (transaction.feePayer) {
+      // Handle both PublicKey objects and our mock objects
+      const feePayer =
+        typeof transaction.feePayer.toString === 'function'
+          ? transaction.feePayer.toString()
+          : transaction.feePayer;
+
+      if (feePayer !== this._publicKey) {
+        throw new ProviderError(
+          ErrorCode.UNAUTHORIZED,
+          'Transaction fee payer does not match connected account.'
+        );
       }
-    } else if (transaction instanceof VersionedTransaction) {
+      return;
+    }
+
+    // Handle VersionedTransaction
+    if (transaction.message && transaction.message.staticAccountKeys) {
       // For VersionedTransaction
-      if (
-        transaction.message &&
-        transaction.message.staticAccountKeys &&
-        transaction.message.staticAccountKeys.length > 0
-      ) {
-        const firstKey = transaction.message.staticAccountKeys[0].toString();
+      if (transaction.message.staticAccountKeys.length > 0) {
+        // Handle both PublicKey objects and strings
+        const firstKey =
+          typeof transaction.message.staticAccountKeys[0].toString === 'function'
+            ? transaction.message.staticAccountKeys[0].toString()
+            : transaction.message.staticAccountKeys[0];
+
         if (firstKey !== this._publicKey) {
           throw new ProviderError(
             ErrorCode.UNAUTHORIZED,

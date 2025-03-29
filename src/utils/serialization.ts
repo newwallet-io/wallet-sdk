@@ -3,6 +3,7 @@
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { ethers } from 'ethers';
 import { ProviderError, ErrorCode } from '../types';
+import { Buffer } from 'buffer';
 
 /**
  * Serialize an Ethereum transaction request for transfer via postMessage
@@ -83,6 +84,7 @@ export function serializeSolanaTransaction(transaction: Transaction | VersionedT
 } {
   try {
     const isVersionedTransaction = transaction instanceof VersionedTransaction;
+
     let serializedTransaction: string;
     if (isVersionedTransaction) {
       // Versioned transaction
