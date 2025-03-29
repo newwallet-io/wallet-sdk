@@ -84,6 +84,20 @@ const RequestDetails = ({ title, description, requestData }) => {
           setParsedData(deserializedTx);
           return;
         }
+        // Handle transaction signing
+        else if (requestData.type === 'ETH_SIGN_AND_SEND_TRANSACTION' &&
+          requestData.payload?.serializedTransaction && 
+          requestData.payload?.encoding === 'json') {
+        
+        // Deserialize Ethereum transaction
+        const deserializedTx = deserializeEthereumTransaction(
+          requestData.payload.serializedTransaction,
+          requestData.payload.encoding
+        );
+        
+        setParsedData(deserializedTx);
+        return;
+        }
         // Handle message signing
         else if (requestData.type === 'ETH_SIGN_MESSAGE' &&
                  requestData.payload?.message) {

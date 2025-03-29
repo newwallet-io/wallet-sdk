@@ -49,6 +49,8 @@ const WalletApp = () => {
           setActivePanelType('eth-connect');
         } else if (data.type === 'ETH_SIGN_TRANSACTION') {
           setActivePanelType('eth-sign-tx');
+        } else if (data.type === 'ETH_SIGN_AND_SEND_TRANSACTION') {
+          setActivePanelType('eth-sign-and-send-tx');
         } else if (data.type === 'ETH_SIGN_MESSAGE') {
           setActivePanelType('eth-sign-msg');
         }
@@ -114,7 +116,13 @@ const WalletApp = () => {
           hash: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
           signedTransaction: "0x" + Array(128).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
         });
-      } else if (requestData.type === 'ETH_SIGN_MESSAGE') {
+      }  else if (requestData.type === 'ETH_SIGN_AND_SEND_TRANSACTION') {
+        // Approve Ethereum transaction signing
+        sendResponse(true, {
+          hash: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+          signedTransaction: "0x" + Array(128).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
+        });
+      }else if (requestData.type === 'ETH_SIGN_MESSAGE') {
         // Approve Ethereum message signing
         sendResponse(true, {
           signature: "0x" + Array(130).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')
@@ -166,6 +174,7 @@ const WalletApp = () => {
     switch (activePanelType) {
       case 'eth-connect': return 'Ethereum Connection Request';
       case 'eth-sign-tx': return 'Ethereum Transaction Request';
+      case 'eth-sign-and-send-tx': return 'Ethereum Transaction Request';
       case 'eth-sign-msg': return 'Ethereum Message Signing Request';
       case 'sol-connect': return 'Solana Connection Request';
       case 'sol-sign-tx': return 'Solana Transaction Request';
@@ -181,6 +190,7 @@ const WalletApp = () => {
     switch (activePanelType) {
       case 'eth-connect': return 'This site wants to connect to your Ethereum wallet';
       case 'eth-sign-tx': return 'This site wants you to sign a transaction';
+      case 'eth-sign-and-send-tx': return 'This site wants you to sign and send a transaction';
       case 'eth-sign-msg': return 'This site wants you to sign a message';
       case 'sol-connect': return 'This site wants to connect to your Solana wallet';
       case 'sol-sign-tx': return 'This site wants you to sign a transaction';

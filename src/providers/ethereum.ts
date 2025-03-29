@@ -311,7 +311,7 @@ export class EthereumProvider {
         ) {
           const { serializedTransaction, encoding } =
             serializeEthereumTransaction(transactionRequest);
-          const request = this._buildRequest(EthereumMessageType.SIGN_TRANSACTION, {
+          const request = this._buildRequest(EthereumMessageType.SIGN_AND_SEND_TRANSACTION, {
             serializedTransaction,
             encoding,
           });
@@ -320,7 +320,7 @@ export class EthereumProvider {
         }
 
         if (
-          data.type === EthereumMessageType.SIGN_TRANSACTION &&
+          data.type === EthereumMessageType.SIGN_AND_SEND_TRANSACTION &&
           origin === this._targetWalletOrigin
         ) {
           cleanup();

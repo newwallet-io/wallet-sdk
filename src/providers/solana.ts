@@ -210,7 +210,7 @@ export class SolanaProvider {
    * @param transaction The transaction to verify (Transaction or VersionedTransaction)
    * @throws ProviderError if the transaction doesn't belong to the connected account
    */
-  private _verifyTransactionOwnership(transaction: Transaction | VersionedTransaction): void {
+  private _verifyTransactionOwnership(transaction: any): void {
     if (!this._publicKey) {
       throw new ProviderError(
         ErrorCode.UNAUTHORIZED,
@@ -219,43 +219,39 @@ export class SolanaProvider {
     }
 
     // Handle LegacyTransaction
-    if (transaction instanceof Transaction) {
-      if (transaction.feePayer) {
-        // Handle both PublicKey objects and our mock objects
-        const feePayer =
-          typeof transaction.feePayer.toString === 'function'
-            ? transaction.feePayer.toString()
-            : transaction.feePayer;
+    if (transaction.feePayer) {
+      // Handle both PublicKey objects and our mock objects
+      const feePayer =
+        typeof transaction.feePayer.toString === 'function'
+          ? transaction.feePayer.toString()
+          : transaction.feePayer;
 
-        if (feePayer !== this._publicKey) {
-          throw new ProviderError(
-            ErrorCode.UNAUTHORIZED,
-            'Transaction fee payer does not match connected account.'
-          );
-        }
-        return;
+      if (feePayer !== this._publicKey) {
+        throw new ProviderError(
+          ErrorCode.UNAUTHORIZED,
+          'Transaction fee payer does not match connected account.'
+        );
       }
+      return;
     }
 
     // Handle VersionedTransaction
-    if (transaction instanceof VersionedTransaction) {
-      if (transaction.message && transaction.message.staticAccountKeys) {
-        // For VersionedTransaction
-        if (transaction.message.staticAccountKeys.length > 0) {
-          // Handle both PublicKey objects and strings
-          const firstKey =
-            typeof transaction.message.staticAccountKeys[0].toString === 'function'
-              ? transaction.message.staticAccountKeys[0].toString()
-              : transaction.message.staticAccountKeys[0];
+    if (transaction.message && transaction.message.staticAccountKeys) {
+      // For VersionedTransaction
+      if (transaction.message.staticAccountKeys.length > 0) {
+        // Handle both PublicKey objects and strings
+        const firstKey =
+          typeof transaction.message.staticAccountKeys[0].toString === 'function'
+            ? transaction.message.staticAccountKeys[0].toString()
+            : transaction.message.staticAccountKeys[0];
 
-          if (firstKey !== this._publicKey) {
-            throw new ProviderError(
-              ErrorCode.UNAUTHORIZED,
-              'Transaction first signer does not match connected account.'
-            );
-          }
-          return;
+        if (firstKey !== this._publicKey) {
+          throw new ProviderError(
+            ErrorCode.UNAUTHORIZED,
+            'Transaction first signer does not match connected account.'
+          );
         }
+        return;
       }
     }
 

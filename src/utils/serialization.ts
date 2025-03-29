@@ -77,13 +77,13 @@ export function deserializeEthereumTransaction(
  * @param transaction The Solana transaction to serialize (Transaction or VersionedTransaction)
  * @returns The serialized transaction data with metadata
  */
-export function serializeSolanaTransaction(transaction: Transaction | VersionedTransaction): {
+export function serializeSolanaTransaction(transaction: any): {
   serializedTransaction: string;
   isVersionedTransaction: boolean;
   encoding: string;
 } {
   try {
-    const isVersionedTransaction = transaction instanceof VersionedTransaction;
+    const isVersionedTransaction = typeof transaction.version !== 'undefined';
 
     let serializedTransaction: string;
     if (isVersionedTransaction) {
