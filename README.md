@@ -49,7 +49,7 @@ yarn build
 yarn install:demos
 
 # Start the demo app
-yarn start:demo
+yarn demo
 
 ```
 
