@@ -36,6 +36,23 @@ const wallet = new NewWallet();
 <script src="https://unpkg.com/@newwallet/wallet-sdk@latest/dist/index.js"></script>
 ```
 
+## Development
+
+```bash
+# Install dependencies
+yarn install
+
+# Build all packages
+yarn build
+
+# Start the demo app
+yarn install:demos
+
+# Start the demo app
+yarn start:demo
+
+```
+
 ## Ethereum API
 
 NewWallet provides an Ethereum provider that follows the [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) standard, making it compatible with existing Ethereum DApps.
