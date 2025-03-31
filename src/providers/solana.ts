@@ -317,7 +317,7 @@ export class SolanaProvider {
           popup.close();
 
           if (data.payload.success) {
-            const serializedTransaction = data.payload.result.signedTransaction;
+            const serializedTransaction = data.payload.result.serializedTransaction;
             const isVersionedTransaction = data.payload.result.isVersionedTransaction || false;
             const encoding = data.payload.result.encoding || 'base64';
 
