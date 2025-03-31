@@ -136,8 +136,16 @@ const WalletApp = () => {
         });
       } else if (requestData.type === 'SOL_SIGN_TRANSACTION') {
         // Approve Solana transaction signing
+        // Return the signed transaction with the same metadata as the request
+        // this is mock data, in real wallet, it should be signed and serialize it and send back
+        const signedTransaction = requestData.payload.serializedTransaction;
+        const isVersionedTransaction = requestData.payload.isVersionedTransaction;
+        const encoding = requestData.payload.encoding;
+        
         sendResponse(true, {
-          signedTransaction: "sol-signed-tx-" + Date.now()
+          signedTransaction,
+          isVersionedTransaction,
+          encoding
         });
       } else if (requestData.type === 'SOL_SIGN_MESSAGE') {
         // Approve Solana message signing
@@ -146,10 +154,15 @@ const WalletApp = () => {
         });
       } else if (requestData.type === 'SOL_SIGN_ALL_TRANSACTIONS') {
         // Approve Solana multi-transaction signing
-        const count = requestData.payload?.transactions?.length || 2;
-        const signedTransactions = Array(count).fill(0).map((_, i) => 
-          `sol-signed-tx-${i}-${Date.now()}`
-        );
+        // Return an array of signed transactions with metadata
+        const serializedTransactions = requestData.payload.serializedTransactions || [];
+        const signedTransactions = serializedTransactions.map(txInfo => {
+          return {
+            serializedTransaction: txInfo.serializedTransaction,
+            isVersionedTransaction: txInfo.isVersionedTransaction,
+            encoding: txInfo.encoding
+          };
+        });
         
         sendResponse(true, {
           signedTransactions

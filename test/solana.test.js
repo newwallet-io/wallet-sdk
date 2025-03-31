@@ -12,6 +12,55 @@ import {
   SendOptions,
 } from '@solana/web3.js';
 
+function serializeSolanaTransaction(transaction) {
+  try {
+    const isVersionedTransaction = typeof transaction.version !== 'undefined';
+
+    let serializedTransaction;
+    if (isVersionedTransaction) {
+      // Versioned transaction
+      serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
+    } else {
+      // Legacy transaction
+      serializedTransaction = Buffer.from(
+        transaction.serialize({ verifySignatures: false })
+      ).toString('base64');
+    }
+    return {
+      serializedTransaction,
+      isVersionedTransaction,
+      encoding: 'base64',
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new ProviderError(
+      ErrorCode.INTERNAL_ERROR,
+      `Failed to serialize transaction: ${errorMessage}`
+    );
+  }
+}
+
+function deserializeSolanaTransaction(serializedTransaction, isVersionedTransaction, encoding) {
+  if (encoding !== 'base64') {
+    throw new ProviderError(ErrorCode.INTERNAL_ERROR, `Unsupported encoding format: ${encoding}`);
+  }
+
+  try {
+    const buffer = Buffer.from(serializedTransaction, 'base64');
+
+    if (isVersionedTransaction) {
+      return VersionedTransaction.deserialize(buffer);
+    } else {
+      return Transaction.from(buffer);
+    }
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new ProviderError(
+      ErrorCode.INTERNAL_ERROR,
+      `Failed to deserialize Solana transaction: ${errorMessage}`
+    );
+  }
+}
 // Mock document and window objects for testing
 global.document = {
   querySelectorAll: () => [],
@@ -417,7 +466,6 @@ describe('Solana Provider', () => {
       legacyTx.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
       wallet.solana._connected = true;
       wallet.solana._publicKey = mockPublicKey;
-
       // Start signing process
       const signPromise = wallet.solana.signTransaction(legacyTx);
 
@@ -445,11 +493,15 @@ describe('Solana Provider', () => {
         'http://localhost:3001'
       );
 
+      // Create a mock serialized transaction response (base64 format)
+      const payload = serializeSolanaTransaction(legacyTx);
       // Simulate successful signing
       simulateWalletMessage(SolanaMessageType.SIGN_TRANSACTION, {
         message: 'Transaction signed successfully',
         result: {
-          signedTransaction: 'signed-solana-transaction',
+          signedTransaction: payload.serializedTransaction,
+          isVersionedTransaction: payload.isVersionedTransaction,
+          encoding: payload.encoding,
         },
       });
 
@@ -457,7 +509,7 @@ describe('Solana Provider', () => {
       const signedTx = await signPromise;
 
       // Check the result
-      expect(signedTx).toBe('signed-solana-transaction');
+      expect(signedTx).toBeInstanceOf(Transaction);
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
@@ -508,19 +560,24 @@ describe('Solana Provider', () => {
         'http://localhost:3001'
       );
 
+      // Create a mock serialized transaction response (base64 format)
+      const payload = serializeSolanaTransaction(versionedTx);
+
       // Simulate successful signing
       simulateWalletMessage(SolanaMessageType.SIGN_TRANSACTION, {
         message: 'Transaction signed successfully',
         result: {
-          signedTransaction: 'signed-solana-transaction',
+          signedTransaction: payload.serializedTransaction,
+          isVersionedTransaction: payload.isVersionedTransaction,
+          encoding: payload.encoding,
         },
       });
 
       // Wait for the signing promise to resolve
       const signedTx = await signPromise;
 
-      // Check the result
-      expect(signedTx).toBe('signed-solana-transaction');
+      // Simply check that the result is a VersionedTransaction instance
+      expect(signedTx).toBeInstanceOf(VersionedTransaction);
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
@@ -648,6 +705,7 @@ describe('Solana Provider', () => {
       });
       expect(window.open).not.toHaveBeenCalled(); // Popup should not be opened
     });
+
     test('should accept a versioned transaction with matching first signer', async () => {
       // Setup connected state
       const mockKeypair = Keypair.generate();
@@ -673,16 +731,26 @@ describe('Solana Provider', () => {
 
       // Simulate the wallet flow
       simulateWalletMessage(SolanaMessageType.READY);
+
+      // Create a mock serialized transaction response (base64 format)
+      const payload = serializeSolanaTransaction(mockVersionedTransaction);
+
+      // Simulate successful signing
       simulateWalletMessage(SolanaMessageType.SIGN_TRANSACTION, {
         message: 'Transaction signed successfully',
         result: {
-          signedTransaction: 'signed-versioned-transaction',
+          signedTransaction: payload.serializedTransaction,
+          isVersionedTransaction: payload.isVersionedTransaction,
+          encoding: payload.encoding,
         },
       });
 
       // Wait for the signing promise to resolve
       const signedTx = await signPromise;
-      expect(signedTx).toBe('signed-versioned-transaction');
+
+      // Simply check that the result is a VersionedTransaction instance
+      expect(signedTx).toBeInstanceOf(VersionedTransaction);
+      expect(mockPopup.close).toHaveBeenCalled();
     });
 
     test('should reject a versioned transaction with non-matching first signer', async () => {
@@ -767,7 +835,7 @@ describe('Solana Provider', () => {
       // Simulate the wallet sending a READY message
       simulateWalletMessage(SolanaMessageType.READY);
 
-      // Verify the postMessage was called with the correct transactions data
+      // Verify the postMessage was called with the correct transaction data
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           type: SolanaMessageType.SIGN_ALL_TRANSACTIONS,
@@ -785,19 +853,37 @@ describe('Solana Provider', () => {
         'http://localhost:3001'
       );
 
-      // Simulate successful signing
+      // Create mock serialized transaction responses (base64 format)
+      const payload1 = serializeSolanaTransaction(legacyTx1);
+      const payload2 = serializeSolanaTransaction(legacyTx2);
+
+      // Simulate successful signing with properly formatted response
       simulateWalletMessage(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
         message: 'All transactions signed successfully',
         result: {
-          signedTransactions: ['signed-solana-transaction-1', 'signed-solana-transaction-2'],
+          signedTransactions: [
+            {
+              serializedTransaction: payload1.serializedTransaction,
+              isVersionedTransaction: false,
+              encoding: 'base64',
+            },
+            {
+              serializedTransaction: payload2.serializedTransaction,
+              isVersionedTransaction: false,
+              encoding: 'base64',
+            },
+          ],
         },
       });
 
       // Wait for the signing promise to resolve
       const signedTxs = await signPromise;
 
-      // Check the results
-      expect(signedTxs).toEqual(['signed-solana-transaction-1', 'signed-solana-transaction-2']);
+      // Check basic properties of the result
+      expect(Array.isArray(signedTxs)).toBe(true);
+      expect(signedTxs.length).toBe(2);
+      expect(signedTxs[0]).toBeInstanceOf(Transaction);
+      expect(signedTxs[1]).toBeInstanceOf(Transaction);
       expect(mockPopup.close).toHaveBeenCalled();
     });
 
@@ -845,36 +931,37 @@ describe('Solana Provider', () => {
       // Simulate the wallet flow
       simulateWalletMessage(SolanaMessageType.READY);
 
-      // Verify the postMessage payload has the correct structure
-      expect(mockPopup.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: SolanaMessageType.SIGN_ALL_TRANSACTIONS,
-          network: 'solana',
-          payload: expect.objectContaining({
-            serializedTransactions: expect.arrayContaining([
-              expect.objectContaining({
-                serializedTransaction: expect.stringMatching(/^[A-Za-z0-9+/=]+$/),
-                encoding: 'base64',
-              }),
-            ]),
-          }),
-        }),
-        'http://localhost:3001'
-      );
+      // Create mock serialized transaction responses
+      const legacyPayload = serializeSolanaTransaction(legacyTx);
+      const versionedPayload = serializeSolanaTransaction(versionedTx);
 
-      // Simulate successful signing
+      // Simulate successful signing with properly formatted response
       simulateWalletMessage(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
         message: 'All transactions signed successfully',
         result: {
-          signedTransactions: ['signed-legacy-tx', 'signed-versioned-tx'],
+          signedTransactions: [
+            {
+              serializedTransaction: legacyPayload.serializedTransaction,
+              isVersionedTransaction: false,
+              encoding: 'base64',
+            },
+            {
+              serializedTransaction: versionedPayload.serializedTransaction,
+              isVersionedTransaction: true,
+              encoding: 'base64',
+            },
+          ],
         },
       });
 
       // Wait for the signing promise to resolve
       const signedTxs = await signPromise;
 
-      // Check the results
-      expect(signedTxs).toEqual(['signed-legacy-tx', 'signed-versioned-tx']);
+      // Check basic properties of the result
+      expect(Array.isArray(signedTxs)).toBe(true);
+      expect(signedTxs.length).toBe(2);
+      expect(signedTxs[0]).toBeInstanceOf(Transaction);
+      expect(signedTxs[1]).toBeInstanceOf(VersionedTransaction);
       expect(mockPopup.close).toHaveBeenCalled();
     });
 

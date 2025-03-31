@@ -188,9 +188,11 @@ const SolanaTab = ({ wallet }) => {
       const signedTx = await wallet.solana.signTransaction(transaction);
       
       console.log('Signed legacy transaction:', signedTx);
+       // Display the transaction details
       setLegacyTxStatus({ 
-        message: `Legacy transaction signed: ${truncateMiddle(signedTx, 20)}`, 
-        className: 'success' 
+        message: `Legacy transaction signed successfully!`, 
+        className: 'success',
+        details: `Transaction has ${signedTx.signatures.length} signature(s)`
       });
     } catch (error) {
       console.error('Legacy transaction signing error:', error);
@@ -221,9 +223,11 @@ const SolanaTab = ({ wallet }) => {
       const signedTx = await wallet.solana.signTransaction(transaction);
       
       console.log('Signed versioned transaction:', signedTx);
+      // Display the transaction details
       setVersionedTxStatus({ 
-        message: `Versioned transaction signed: ${truncateMiddle(signedTx, 20)}`, 
-        className: 'success' 
+        message: `Versioned transaction signed successfully!`, 
+        className: 'success',
+        details: `Transaction version: ${signedTx.version}, with ${signedTx.signatures ? signedTx.signatures.length : 0} signature(s)`
       });
     } catch (error) {
       console.error('Versioned transaction signing error:', error);
@@ -272,10 +276,13 @@ const SolanaTab = ({ wallet }) => {
       const signedTxs = await wallet.solana.signAllTransactions(transactions);
       console.log('Signed transactions:', signedTxs);
       
+      // signedTxs will be an array of Transaction and VersionedTransaction objects
       // Create transaction details HTML
-      const txDetails = signedTxs.map((tx, i) => 
-        `Transaction ${i+1}: ${truncateMiddle(tx, 15)}`
-      ).join('<br/>');
+      const txDetails = signedTxs.map((tx, i) => {
+        const txType = tx.version !== undefined ? 'Versioned' : 'Legacy';
+        const sigCount = tx.signatures ? tx.signatures.length : 'unknown';
+        return `Transaction ${i+1}: ${txType} Transaction with ${sigCount} signature(s)`;
+      }).join('<br/>');
       
       setSignAllTxStatus({ 
         message: `${txCount} transactions signed successfully`, 

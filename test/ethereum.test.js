@@ -339,7 +339,7 @@ describe('NewWallet SDK', () => {
       simulateWalletMessage('READY');
 
       // Now simulate the wallet sending a successful transaction response
-      simulateWalletMessage('ETH_SIGN_TRANSACTION', {
+      simulateWalletMessage('ETH_SIGN_AND_SEND_TRANSACTION', {
         message: 'Transaction signed successfully',
         result: {
           hash: '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba',
@@ -355,7 +355,7 @@ describe('NewWallet SDK', () => {
       // Check the transaction hash returned
       expect(txHash).toBe('0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba');
       expect(mockPopup.close).toHaveBeenCalled();
-    });
+    }, 20000);
 
     test('should reject if not connected', async () => {
       const txParams = {

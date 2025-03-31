@@ -7,7 +7,7 @@ import {
   ProviderError,
 } from '../types';
 import { openPopup } from '../utils';
-import { serializeSolanaTransaction } from '../utils/serialization';
+import { serializeSolanaTransaction, deserializeSolanaTransaction } from '../utils/serialization';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 
 export class SolanaProvider {
@@ -267,7 +267,9 @@ export class SolanaProvider {
    * @param transaction The transaction to sign
    * @returns A promise that resolves to the signed transaction
    */
-  async signTransaction(transaction: Transaction | VersionedTransaction): Promise<any> {
+  async signTransaction(
+    transaction: Transaction | VersionedTransaction
+  ): Promise<Transaction | VersionedTransaction> {
     if (!this._connected) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
     }
@@ -315,7 +317,19 @@ export class SolanaProvider {
           popup.close();
 
           if (data.payload.success) {
-            resolve(data.payload.result.signedTransaction);
+            const serializedTransaction = data.payload.result.signedTransaction;
+            const isVersionedTransaction = data.payload.result.isVersionedTransaction || false;
+            const encoding = data.payload.result.encoding || 'base64';
+
+            // Use the existing deserializeSolanaTransaction utility function
+            const signedTransaction = deserializeSolanaTransaction(
+              serializedTransaction,
+              isVersionedTransaction,
+              encoding
+            );
+
+            // Return the deserialized transaction object
+            resolve(signedTransaction);
           } else {
             const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
             reject(new ProviderError(errorCode, data.payload.message));
@@ -416,7 +430,23 @@ export class SolanaProvider {
           popup.close();
 
           if (data.payload.success) {
-            resolve(data.payload.result.signedTransactions);
+            // Get the array of serialized signed transactions
+            const signedTransactionsData: string[] = data.payload.result.signedTransactions || [];
+
+            // Deserialize each transaction
+            const deserializedTransactions = signedTransactionsData.map(
+              (txData: any, index: number) => {
+                // Deserialize the transaction
+                return deserializeSolanaTransaction(
+                  txData.serializedTransaction,
+                  txData.isVersionedTransaction,
+                  txData.encoding
+                );
+              }
+            );
+
+            // Return the array of deserialized transaction objects
+            resolve(deserializedTransactions);
           } else {
             const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
             reject(new ProviderError(errorCode, data.payload.message));
