@@ -1,5 +1,5 @@
 # NewWallet SDK Documentation
-
+[![Demo App](https://img.shields.io/badge/Demo-Try%20Now-4CAF50)](https://dapp-demo.newwallet.io/)
 ## Introduction
 
 NewWallet SDK allows developers to connect their decentralized applications (DApps) to NewWallet, enabling users to interact with multiple blockchain networks including Ethereum and Solana. The SDK provides a consistent interface for wallet connection, transaction signing, and other blockchain operations.
