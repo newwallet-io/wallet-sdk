@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import './TabStyles.css';
 import StatusMessage from './StatusMessage';
 import TransactionItem from './TransactionItem';
-import { Connection, SystemProgram, Transaction, PublicKey, VersionedTransaction, TransactionMessage } from '@solana/web3.js';
+import { Connection, SystemProgram, Transaction, PublicKey, VersionedTransaction, TransactionMessage, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getSolanaNetwork } from '../utils/Networks';
 
 const SolanaTab = ({ wallet }) => {
   const [connected, setConnected] = useState(false);
   const [publicKey, setPublicKey] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [networkInfo, setNetworkInfo] = useState(null);
+  const [connection, setConnection] = useState(null);
   const [toAddress, setToAddress] = useState('CR1GHp2xaKcxoRoQ8Xye2W1p4CZL5SHZ8p4oPhfJszFb');
   const [amount, setAmount] = useState('0.001');
   const [message, setMessage] = useState('Hello, Solana!');
@@ -42,6 +46,42 @@ const SolanaTab = ({ wallet }) => {
     };
   }, [wallet]);
 
+  // Set up Solana connection and network info
+  useEffect(() => {
+    if (connected && publicKey) {
+      // For this demo, we're assuming testnet environment
+      // In a real app, you might determine this from wallet.solana or config
+      const isTestnet = false; // Default to mainnet for now
+      const network = getSolanaNetwork(isTestnet);
+      setNetworkInfo(network);
+      
+      // Create connection to Solana cluster
+      const conn = new Connection(network.rpcUrl);
+      setConnection(conn);
+      
+      // Fetch account balance
+      fetchAccountBalance(conn, publicKey);
+    } else {
+      setBalance(null);
+      setNetworkInfo(null);
+      setConnection(null);
+    }
+  }, [connected, publicKey]);
+
+  const fetchAccountBalance = async (conn, pubKey) => {
+    if (!conn || !pubKey) return;
+    
+    try {
+      const publicKeyObj = new PublicKey(pubKey);
+      const balanceInLamports = await conn.getBalance(publicKeyObj);
+      const balanceInSOL = balanceInLamports / LAMPORTS_PER_SOL;
+      setBalance(balanceInSOL);
+    } catch (error) {
+      console.error('Error fetching Solana balance:', error);
+      setBalance('Error');
+    }
+  };
+
   const handleConnect = (pubKey) => {
     console.log('Connected with public key:', pubKey);
     setConnected(true);
@@ -52,6 +92,7 @@ const SolanaTab = ({ wallet }) => {
     console.log('Disconnected from wallet');
     setConnected(false);
     setPublicKey(null);
+    setBalance(null);
   };
 
   const connectWallet = async () => {
@@ -91,6 +132,15 @@ const SolanaTab = ({ wallet }) => {
     return str.substring(0, halfLength) + '...' + str.substring(str.length - halfLength);
   };
 
+  // Format balance for display
+  const formatBalance = (balance) => {
+    if (balance === null) return 'N/A';
+    if (balance === 'Error') return 'Error fetching balance';
+    
+    // Convert to number and format with 6 decimal places
+    return parseFloat(balance).toFixed(6);
+  };
+
   // Create a legacy transaction
   const createLegacyTransaction = (fromPublicKey, toAddress, amount) => {
     if (!fromPublicKey) {
@@ -103,7 +153,7 @@ const SolanaTab = ({ wallet }) => {
       const toPubkey = new PublicKey(toAddress);
       
       // Convert SOL to lamports (1 SOL = 10^9 lamports)
-      const lamports = Math.floor(parseFloat(amount) * 1e9);
+      const lamports = Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL);
       
       // Create a new transaction
       const transaction = new Transaction();
@@ -142,7 +192,7 @@ const SolanaTab = ({ wallet }) => {
       const toPubkey = new PublicKey(toAddress);
       
       // Convert SOL to lamports (1 SOL = 10^9 lamports)
-      const lamports = Math.floor(parseFloat(amount) * 1e9);
+      const lamports = Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL);
       
       // Create a transfer instruction
       const transferInstruction = SystemProgram.transfer({
@@ -169,7 +219,7 @@ const SolanaTab = ({ wallet }) => {
   };
 
   // Sign a legacy transaction
-  const signLegacyTransaction = async () => {
+  const handleSignLegacyTransaction = async () => {
     if (!connected) {
       alert('Please connect your wallet first');
       return;
@@ -187,12 +237,14 @@ const SolanaTab = ({ wallet }) => {
       // Sign the transaction
       const signedTx = await wallet.solana.signTransaction(transaction);
       
+      // signedTx is now a Transaction object
       console.log('Signed legacy transaction:', signedTx);
-       // Display the transaction details
+      
+      // Display the transaction details
       setLegacyTxStatus({ 
         message: `Legacy transaction signed successfully!`, 
         className: 'success',
-        details: `Transaction has ${signedTx.signatures.length} signature(s)`
+        details: `Transaction has ${signedTx.signatures ? signedTx.signatures.length : 0} signature(s)`
       });
     } catch (error) {
       console.error('Legacy transaction signing error:', error);
@@ -204,7 +256,7 @@ const SolanaTab = ({ wallet }) => {
   };
 
   // Sign a versioned transaction
-  const signVersionedTransaction = async () => {
+  const handleSignVersionedTransaction = async () => {
     if (!connected) {
       alert('Please connect your wallet first');
       return;
@@ -222,12 +274,14 @@ const SolanaTab = ({ wallet }) => {
       // Sign the transaction
       const signedTx = await wallet.solana.signTransaction(transaction);
       
+      // signedTx is now a VersionedTransaction object
       console.log('Signed versioned transaction:', signedTx);
+      
       // Display the transaction details
       setVersionedTxStatus({ 
         message: `Versioned transaction signed successfully!`, 
         className: 'success',
-        details: `Transaction version: ${signedTx.version}, with ${signedTx.signatures ? signedTx.signatures.length : 0} signature(s)`
+        details: `Transaction version: ${signedTx.version !== undefined ? signedTx.version : 'unknown'}, with ${signedTx.signatures ? signedTx.signatures.length : 0} signature(s)`
       });
     } catch (error) {
       console.error('Versioned transaction signing error:', error);
@@ -238,8 +292,8 @@ const SolanaTab = ({ wallet }) => {
     }
   };
 
-  // Sign multiple transactions (mix of legacy and versioned)
-  const signAllTransactions = async () => {
+  // Sign multiple transactions
+  const handleSignAllTransactions = async () => {
     if (!connected) {
       alert('Please connect your wallet first');
       return;
@@ -298,8 +352,8 @@ const SolanaTab = ({ wallet }) => {
     }
   };
 
-  // Send transaction
-  const sendTransaction = async () => {
+  // Sign and send a transaction
+  const handleSendTransaction = async () => {
     if (!connected) {
       alert('Please connect your wallet first');
       return;
@@ -331,7 +385,7 @@ const SolanaTab = ({ wallet }) => {
   };
 
   // Sign message
-  const signMessage = async () => {
+  const handleSignMessage = async () => {
     if (!connected) {
       alert('Please connect your wallet first');
       return;
@@ -400,6 +454,26 @@ const SolanaTab = ({ wallet }) => {
         <h2>Account Information</h2>
         <div className="account-info">
           <div><strong>Public Key:</strong> <span className="address">{publicKey || 'Not connected'}</span></div>
+          <div><strong>Balance:</strong> <span className="balance">{formatBalance(balance)} {networkInfo?.symbol || 'SOL'}</span></div>
+          
+          {networkInfo && (
+            <div className="network-details">
+              <div><strong>Network:</strong> <span>{networkInfo.networkName}</span></div>
+              <div><strong>Chain ID:</strong> <span>{networkInfo.chainId}</span></div>
+              <div><strong>RPC URL:</strong> <span>{networkInfo.rpcUrl}</span></div>
+              {networkInfo.blockExplorerSite && (
+                <div>
+                  <strong>Explorer:</strong> 
+                  <a href={networkInfo.blockExplorerSite} target="_blank" rel="noopener noreferrer">
+                    {networkInfo.blockExplorerSite}
+                  </a>
+                </div>
+              )}
+              <div>
+                <strong>Testnet:</strong> <span>{networkInfo.isTestnet ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
@@ -414,7 +488,7 @@ const SolanaTab = ({ wallet }) => {
           />
         </div>
         <button 
-          onClick={signMessage} 
+          onClick={handleSignMessage} 
           disabled={!connected}
           className="sign-btn"
         >
@@ -446,7 +520,7 @@ const SolanaTab = ({ wallet }) => {
           />
         </div>
         <button 
-          onClick={signLegacyTransaction} 
+          onClick={handleSignLegacyTransaction} 
           disabled={!connected}
           className="sign-tx-btn"
         >
@@ -478,7 +552,7 @@ const SolanaTab = ({ wallet }) => {
           />
         </div>
         <button 
-          onClick={signVersionedTransaction} 
+          onClick={handleSignVersionedTransaction} 
           disabled={!connected}
           className="sign-tx-btn"
         >
@@ -501,7 +575,7 @@ const SolanaTab = ({ wallet }) => {
           />
         </div>
         <button 
-          onClick={signAllTransactions} 
+          onClick={handleSignAllTransactions} 
           disabled={!connected}
           className="sign-all-btn"
         >
@@ -533,7 +607,7 @@ const SolanaTab = ({ wallet }) => {
           />
         </div>
         <button 
-          onClick={sendTransaction} 
+          onClick={handleSendTransaction} 
           disabled={!connected}
           className="send-btn"
         >
@@ -553,6 +627,7 @@ const SolanaTab = ({ wallet }) => {
                 key={index} 
                 transaction={tx} 
                 network="solana" 
+                explorerUrl={networkInfo?.blockExplorerSite}
               />
             ))
           )}

@@ -56,3 +56,113 @@
   .tab-content {
     padding: 20px 0;
   }
+
+  .wallet-config {
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e0e0e0;
+  }
+  
+  .wallet-config .form-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+  }
+  
+  .wallet-config label {
+    font-weight: bold;
+    margin-right: 15px;
+    min-width: 90px;
+    color: #333;
+  }
+  
+  .wallet-url-select {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    background-color: white;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23131313%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px top 50%;
+    background-size: 10px auto;
+    padding-right: 30px;
+  }
+  
+  .wallet-url-select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  }
+  
+  .wallet-url-select option {
+    padding: 10px;
+  }
+  
+  /* Environment indicator */
+  .environment-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  
+  .environment-localhost {
+    background-color: #e0f2f1;
+    color: #00796b;
+  }
+  
+  .environment-testnet {
+    background-color: #e8eaf6;
+    color: #3f51b5;
+  }
+  
+  .environment-mainnet {
+    background-color: #fce4ec;
+    color: #e91e63;
+  }
+  
+  /* Network selector toggle */
+  .network-toggle {
+    display: flex;
+    margin-top: 10px;
+  }
+  
+  .network-toggle button {
+    flex: 1;
+    padding: 8px 15px;
+    font-size: 13px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    margin: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .network-toggle button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  
+  .network-toggle button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+  
+  .network-toggle button.active {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #3e8e41;
+  }
+  
+  .network-toggle button:hover:not(.active) {
+    background-color: #e8e8e8;
+  }

@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import './TabStyles.css';
 import StatusMessage from './StatusMessage';
 import TransactionItem from './TransactionItem';
+import { getEthereumNetworkByChainId } from '../utils/Networks';
+import { ethers } from 'ethers';
 
 const EthereumTab = ({ wallet }) => {
   const [connected, setConnected] = useState(false);
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
+  const [balance, setBalance] = useState(null);
+  const [networkInfo, setNetworkInfo] = useState(null);
   const [toAddress, setToAddress] = useState('0x0987654321098765432109876543210987654321');
   const [amount, setAmount] = useState('0.001');
   const [message, setMessage] = useState('Hello, Ethereum!');
@@ -36,6 +40,18 @@ const EthereumTab = ({ wallet }) => {
     };
   }, [wallet]);
   
+  // Fetch account balance when account or network changes
+  useEffect(() => {
+    if (connected && account && chainId) {
+      fetchAccountBalance();
+      const network = getEthereumNetworkByChainId(chainId);
+      setNetworkInfo(network);
+    } else {
+      setBalance(null);
+      setNetworkInfo(null);
+    }
+  }, [connected, account, chainId]);
+  
   const checkConnection = async () => {
     try {
       const accounts = await wallet.ethereum.request({ method: 'eth_accounts' });
@@ -50,11 +66,33 @@ const EthereumTab = ({ wallet }) => {
     }
   };
 
+  const fetchAccountBalance = async () => {
+    if (!account || !chainId) return;
+    
+    try {
+      // Get the network info to determine RPC URL
+      const network = getEthereumNetworkByChainId(chainId);
+      if (!network) return;
+      
+      // Create provider
+      const provider = new ethers.JsonRpcProvider(network.rpcUrl);
+      
+      // Get balance
+      const balanceWei = await provider.getBalance(account);
+      const balanceEther = ethers.formatEther(balanceWei);
+      setBalance(balanceEther);
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      setBalance('Error');
+    }
+  };
+
   const handleAccountsChanged = (accounts) => {
     if (accounts.length === 0) {
       // Disconnected
       setConnected(false);
       setAccount(null);
+      setBalance(null);
     } else {
       // Connected
       setConnected(true);
@@ -67,16 +105,8 @@ const EthereumTab = ({ wallet }) => {
   };
 
   const getNetworkName = (chainId) => {
-    switch (chainId) {
-      case '0x1': return 'Ethereum Mainnet';
-      case '0x3': return 'Ropsten Testnet';
-      case '0x4': return 'Rinkeby Testnet';
-      case '0x5': return 'Goerli Testnet';
-      case '0x2a': return 'Kovan Testnet';
-      case '0x89': return 'Polygon Mainnet';
-      case '0x13881': return 'Polygon Mumbai';
-      default: return `Unknown (${chainId})`;
-    }
+    const network = getEthereumNetworkByChainId(chainId);
+    return network ? network.networkName : `Unknown (${chainId})`;
   };
 
   const connectWallet = async () => {
@@ -102,6 +132,8 @@ const EthereumTab = ({ wallet }) => {
     // This just clears the local state
     setConnected(false);
     setAccount(null);
+    setBalance(null);
+    setChainId(null);
     setConnectionStatus({ message: 'Disconnected', className: '' });
   };
 
@@ -111,8 +143,7 @@ const EthereumTab = ({ wallet }) => {
     }
     
     // Convert ETH to Wei (1 ETH = 10^18 Wei)
-    // eslint-disable-next-line no-undef
-    const weiAmount = BigInt(parseFloat(amount) * 1e18);
+    const weiAmount = window.BigInt(parseFloat(amount) * 1e18);
     const weiHex = '0x' + weiAmount.toString(16);
     
     // Create a properly formatted transaction object
@@ -236,6 +267,16 @@ const EthereumTab = ({ wallet }) => {
     return str.substring(0, maxLength / 2) + '...' + str.substring(str.length - maxLength / 2);
   };
 
+  // Format balance for display
+  const formatBalance = (balance) => {
+    if (balance === null) return 'N/A';
+    if (balance === 'Error') return 'Error fetching balance';
+    
+    // Convert to number and format with 6 decimal places
+    const numBalance = parseFloat(balance);
+    return numBalance.toFixed(6);
+  };
+
   return (
     <div className="ethereum-tab">
       <div className="card">
@@ -264,6 +305,24 @@ const EthereumTab = ({ wallet }) => {
         <div className="account-info">
           <div><strong>Address:</strong> <span className="address">{account || 'Not connected'}</span></div>
           <div><strong>Network:</strong> <span className="network">{chainId ? getNetworkName(chainId) : 'Unknown'}</span></div>
+          <div><strong>Balance:</strong> <span className="balance">{formatBalance(balance)} {networkInfo?.symbol || 'ETH'}</span></div>
+          
+          {networkInfo && (
+            <div className="network-details">
+              <div><strong>RPC URL:</strong> <span>{networkInfo.rpcUrl}</span></div>
+              {networkInfo.blockExplorerSite && (
+                <div>
+                  <strong>Explorer:</strong> 
+                  <a href={networkInfo.blockExplorerSite} target="_blank" rel="noopener noreferrer">
+                    {networkInfo.blockExplorerSite}
+                  </a>
+                </div>
+              )}
+              <div>
+                <strong>Testnet:</strong> <span>{networkInfo.isTestnet ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
@@ -362,6 +421,7 @@ const EthereumTab = ({ wallet }) => {
                 key={index} 
                 transaction={tx} 
                 network="ethereum" 
+                explorerUrl={networkInfo?.blockExplorerSite}
               />
             ))
           )}
