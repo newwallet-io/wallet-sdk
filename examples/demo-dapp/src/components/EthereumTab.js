@@ -15,23 +15,23 @@ const EthereumTab = ({ wallet }) => {
   const [amount, setAmount] = useState('0.001');
   const [message, setMessage] = useState('Hello, Ethereum!');
   const [transactions, setTransactions] = useState([]);
-  
+
   // Status messages
   const [connectionStatus, setConnectionStatus] = useState({ message: '', className: '' });
   const [txStatus, setTxStatus] = useState({ message: '', className: '' });
   const [signTxStatus, setSignTxStatus] = useState({ message: '', className: '' });
   const [signatureStatus, setSignatureStatus] = useState({ message: '', className: '' });
-  
+
   useEffect(() => {
     if (wallet && wallet.ethereum) {
       // Set up event listeners
       wallet.ethereum.on('accountsChanged', handleAccountsChanged);
       wallet.ethereum.on('chainChanged', handleChainChanged);
-      
+
       // Check if already connected
       checkConnection();
     }
-    
+
     return () => {
       if (wallet && wallet.ethereum) {
         wallet.ethereum.off('accountsChanged', handleAccountsChanged);
@@ -39,7 +39,7 @@ const EthereumTab = ({ wallet }) => {
       }
     };
   }, [wallet]);
-  
+
   // Fetch account balance when account or network changes
   useEffect(() => {
     if (connected && account && chainId) {
@@ -51,13 +51,13 @@ const EthereumTab = ({ wallet }) => {
       setNetworkInfo(null);
     }
   }, [connected, account, chainId]);
-  
+
   const checkConnection = async () => {
     try {
       const accounts = await wallet.ethereum.request({ method: 'eth_accounts' });
       if (accounts && accounts.length > 0) {
         handleAccountsChanged(accounts);
-        
+
         const chainId = await wallet.ethereum.request({ method: 'eth_chainId' });
         handleChainChanged(chainId);
       }
@@ -68,15 +68,15 @@ const EthereumTab = ({ wallet }) => {
 
   const fetchAccountBalance = async () => {
     if (!account || !chainId) return;
-    
+
     try {
       // Get the network info to determine RPC URL
       const network = getEthereumNetworkByChainId(chainId);
       if (!network) return;
-      
+
       // Create provider
       const provider = new ethers.JsonRpcProvider(network.rpcUrl);
-      
+
       // Get balance
       const balanceWei = await provider.getBalance(account);
       const balanceEther = ethers.formatEther(balanceWei);
@@ -112,17 +112,17 @@ const EthereumTab = ({ wallet }) => {
   const connectWallet = async () => {
     try {
       setConnectionStatus({ message: 'Connecting...', className: '' });
-      
+
       const accounts = await wallet.ethereum.request({
         method: 'eth_requestAccounts'
       });
-      
+
       setConnectionStatus({ message: 'Connected!', className: 'success' });
     } catch (error) {
       console.error('Connection error:', error);
-      setConnectionStatus({ 
-        message: `Connection failed: ${error.message}`, 
-        className: 'error' 
+      setConnectionStatus({
+        message: `Connection failed: ${error.message}`,
+        className: 'error'
       });
     }
   };
@@ -141,11 +141,11 @@ const EthereumTab = ({ wallet }) => {
     if (!connected || !account) {
       throw new Error('Please connect your wallet first');
     }
-    
+
     // Convert ETH to Wei (1 ETH = 10^18 Wei)
     const weiAmount = window.BigInt(parseFloat(amount) * 1e18);
     const weiHex = '0x' + weiAmount.toString(16);
-    
+
     // Create a properly formatted transaction object
     return {
       from: account,
@@ -161,30 +161,30 @@ const EthereumTab = ({ wallet }) => {
       alert('Please connect your wallet first');
       return;
     }
-    
+
     try {
       setSignTxStatus({ message: 'Signing transaction...', className: '' });
-      
+
       // Create transaction parameters
       const txParams = createTransactionParams();
       console.log('Signing transaction with params:', txParams);
-      
+
       // Sign the transaction
       const signedTx = await wallet.ethereum.request({
         method: 'eth_signTransaction',
         params: [txParams]
       });
-      
+
       console.log('Signed transaction:', signedTx);
-      setSignTxStatus({ 
-        message: `Transaction signed! Signature: ${truncateString(signedTx, 40)}`, 
-        className: 'success' 
+      setSignTxStatus({
+        message: `Transaction signed! Signature: ${truncateString(signedTx, 40)}`,
+        className: 'success'
       });
     } catch (error) {
       console.error('Transaction signing error:', error);
-      setSignTxStatus({ 
-        message: `Transaction signing failed: ${error.message}`, 
-        className: 'error' 
+      setSignTxStatus({
+        message: `Transaction signing failed: ${error.message}`,
+        className: 'error'
       });
     }
   };
@@ -194,30 +194,30 @@ const EthereumTab = ({ wallet }) => {
       alert('Please connect your wallet first');
       return;
     }
-    
+
     try {
       setTxStatus({ message: 'Sending transaction...', className: '' });
-      
+
       // Create transaction parameters
       const txParams = createTransactionParams();
       console.log('Sending transaction with params:', txParams);
-      
+
       // Send the transaction
       const txHash = await wallet.ethereum.request({
         method: 'eth_sendTransaction',
         params: [txParams]
       });
-      
+
       console.log('Transaction sent:', txHash);
       setTxStatus({ message: `Transaction sent: ${txHash}`, className: 'success' });
-      
+
       // Add to transaction history
       addTransactionToHistory(txHash, toAddress, amount);
     } catch (error) {
       console.error('Transaction error:', error);
-      setTxStatus({ 
-        message: `Transaction failed: ${error.message}`, 
-        className: 'error' 
+      setTxStatus({
+        message: `Transaction failed: ${error.message}`,
+        className: 'error'
       });
     }
   };
@@ -227,24 +227,24 @@ const EthereumTab = ({ wallet }) => {
       alert('Please connect your wallet first');
       return;
     }
-    
+
     try {
       setSignatureStatus({ message: 'Signing message...', className: '' });
-      
+
       const signature = await wallet.ethereum.request({
         method: 'personal_sign',
         params: [message, account]
       });
-      
-      setSignatureStatus({ 
-        message: `Signature: ${signature}`, 
-        className: 'success' 
+
+      setSignatureStatus({
+        message: `Signature: ${signature}`,
+        className: 'success'
       });
     } catch (error) {
       console.error('Signing error:', error);
-      setSignatureStatus({ 
-        message: `Signing failed: ${error.message}`, 
-        className: 'error' 
+      setSignatureStatus({
+        message: `Signing failed: ${error.message}`,
+        className: 'error'
       });
     }
   };
@@ -256,7 +256,7 @@ const EthereumTab = ({ wallet }) => {
       amount,
       timestamp: new Date().toLocaleString()
     };
-    
+
     setTransactions(prevTransactions => [transaction, ...prevTransactions]);
   };
 
@@ -271,7 +271,7 @@ const EthereumTab = ({ wallet }) => {
   const formatBalance = (balance) => {
     if (balance === null) return 'N/A';
     if (balance === 'Error') return 'Error fetching balance';
-    
+
     // Convert to number and format with 6 decimal places
     const numBalance = parseFloat(balance);
     return numBalance.toFixed(6);
@@ -283,15 +283,15 @@ const EthereumTab = ({ wallet }) => {
         <h2>Wallet Connection</h2>
         <StatusMessage {...connectionStatus} />
         <div className="button-container">
-          <button 
-            onClick={connectWallet} 
+          <button
+            onClick={connectWallet}
             disabled={connected}
             className="connect-btn"
           >
             Connect Wallet
           </button>
-          <button 
-            onClick={disconnectWallet} 
+          <button
+            onClick={disconnectWallet}
             disabled={!connected}
             className="disconnect-btn"
           >
@@ -299,20 +299,20 @@ const EthereumTab = ({ wallet }) => {
           </button>
         </div>
       </div>
-      
+
       <div className="card">
         <h2>Account Information</h2>
         <div className="account-info">
           <div><strong>Address:</strong> <span className="address">{account || 'Not connected'}</span></div>
           <div><strong>Network:</strong> <span className="network">{chainId ? getNetworkName(chainId) : 'Unknown'}</span></div>
           <div><strong>Balance:</strong> <span className="balance">{formatBalance(balance)} {networkInfo?.symbol || 'ETH'}</span></div>
-          
+
           {networkInfo && (
             <div className="network-details">
               <div><strong>RPC URL:</strong> <span>{networkInfo.rpcUrl}</span></div>
               {networkInfo.blockExplorerSite && (
                 <div>
-                  <strong>Explorer:</strong> 
+                  <strong>Explorer:</strong>
                   <a href={networkInfo.blockExplorerSite} target="_blank" rel="noopener noreferrer">
                     {networkInfo.blockExplorerSite}
                   </a>
@@ -325,31 +325,31 @@ const EthereumTab = ({ wallet }) => {
           )}
         </div>
       </div>
-      
+
       <div className="card">
         <h2>Sign Transaction</h2>
         <div className="form-group">
           <label htmlFor="eth-sign-toAddress">To Address:</label>
-          <input 
-            type="text" 
-            id="eth-sign-toAddress" 
-            value={toAddress} 
+          <input
+            type="text"
+            id="eth-sign-toAddress"
+            value={toAddress}
             onChange={(e) => setToAddress(e.target.value)}
           />
         </div>
         <div className="form-group">
           <label htmlFor="eth-sign-amount">Amount (ETH):</label>
-          <input 
-            type="number" 
-            id="eth-sign-amount" 
-            value={amount} 
-            onChange={(e) => setAmount(e.target.value)} 
-            step="0.001" 
+          <input
+            type="number"
+            id="eth-sign-amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            step="0.001"
             min="0"
           />
         </div>
-        <button 
-          onClick={signTransaction} 
+        <button
+          onClick={signTransaction}
           disabled={!connected}
           className="sign-tx-btn"
         >
@@ -357,31 +357,38 @@ const EthereumTab = ({ wallet }) => {
         </button>
         <StatusMessage {...signTxStatus} />
       </div>
-      
+
       <div className="card">
         <h2>Send Transaction</h2>
+        <div className="developer-note">
+          <p><strong>Note for Developers:</strong> When using <code>eth_sendTransaction</code>, be aware of the below issue:</p>
+          <ul>
+            <li>Public RPC nodes may have request limits or restrictions on transaction broadcasts</li>
+            <li>If transaction submission fails, consider implementing your own transaction broadcast logic</li>
+          </ul>
+        </div>
         <div className="form-group">
           <label htmlFor="eth-toAddress">To Address:</label>
-          <input 
-            type="text" 
-            id="eth-toAddress" 
-            value={toAddress} 
+          <input
+            type="text"
+            id="eth-toAddress"
+            value={toAddress}
             onChange={(e) => setToAddress(e.target.value)}
           />
         </div>
         <div className="form-group">
           <label htmlFor="eth-amount">Amount (ETH):</label>
-          <input 
-            type="number" 
-            id="eth-amount" 
-            value={amount} 
-            onChange={(e) => setAmount(e.target.value)} 
-            step="0.001" 
+          <input
+            type="number"
+            id="eth-amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            step="0.001"
             min="0"
           />
         </div>
-        <button 
-          onClick={sendTransaction} 
+        <button
+          onClick={sendTransaction}
           disabled={!connected}
           className="transaction-btn"
         >
@@ -389,19 +396,19 @@ const EthereumTab = ({ wallet }) => {
         </button>
         <StatusMessage {...txStatus} />
       </div>
-      
+
       <div className="card">
         <h2>Sign Message</h2>
         <div className="form-group">
           <label htmlFor="eth-message">Message:</label>
-          <textarea 
-            id="eth-message" 
-            value={message} 
+          <textarea
+            id="eth-message"
+            value={message}
             onChange={(e) => setMessage(e.target.value)}
           />
         </div>
-        <button 
-          onClick={signMessage} 
+        <button
+          onClick={signMessage}
           disabled={!connected}
           className="sign-btn"
         >
@@ -409,7 +416,7 @@ const EthereumTab = ({ wallet }) => {
         </button>
         <StatusMessage {...signatureStatus} />
       </div>
-      
+
       <div className="card">
         <h2>Transaction History</h2>
         <div className="transaction-history">
@@ -417,10 +424,10 @@ const EthereumTab = ({ wallet }) => {
             <p>No transactions yet</p>
           ) : (
             transactions.map((tx, index) => (
-              <TransactionItem 
-                key={index} 
-                transaction={tx} 
-                network="ethereum" 
+              <TransactionItem
+                key={index}
+                transaction={tx}
+                network="ethereum"
                 explorerUrl={networkInfo?.blockExplorerSite}
               />
             ))

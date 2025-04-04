@@ -118,3 +118,39 @@
     font-family: monospace;
     word-break: break-all;
   }
+
+  .developer-note {
+    background-color: #fff8e1;
+    border-left: 4px solid #ffc107;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: 0 4px 4px 0;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .developer-note p {
+    margin: 0 0 10px 0;
+    color: #5d4037;
+  }
+  
+  .developer-note strong {
+    color: #e65100;
+  }
+  
+  .developer-note code {
+    background-color: rgba(0, 0, 0, 0.06);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, 'Andale Mono', monospace;
+    font-size: 13px;
+  }
+  
+  .developer-note ul {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  
+  .developer-note li {
+    margin-bottom: 5px;
+  }
