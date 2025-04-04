@@ -55,8 +55,7 @@ export const SUPPORTED_NETWORKS = {
   
   // Wallet connection URLs
   export const WALLET_URLS = {
-    // localhost: 'http://localhost:3002',
-    localhost: 'http://localhost:4040/transaction_signing',
+    localhost: 'http://localhost:3002',
     testnet: 'https://testnet.newwallet.io/transaction_signing',
     mainnet: 'https://newwallet.io/transaction_signing'
   };
