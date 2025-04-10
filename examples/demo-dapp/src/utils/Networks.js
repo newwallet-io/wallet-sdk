@@ -61,4 +61,4 @@ export const SUPPORTED_NETWORKS = {
   };
   
   // Default wallet URL
-  export const DEFAULT_WALLET_URL = WALLET_URLS.localhost;
+  export const DEFAULT_WALLET_URL = WALLET_URLS.testnet;
