@@ -149,7 +149,6 @@ describe('Ethereumwallet.ethereum', () => {
       expect(window.open).toHaveBeenCalledWith(walletUrl, expect.any(String), expect.any(String));
 
       simulateWalletMessage('READY');
-      console.log('Mock popup postMessage calls:', mockPopup.postMessage.mock.calls);
       // Check requested all chains
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -169,7 +168,6 @@ describe('Ethereumwallet.ethereum', () => {
         }),
         'http://localhost:3001'
       );
-      console.log('Mock popup postMessage calls:1');
       // Simulate response with different accounts per chain
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
@@ -190,7 +188,6 @@ describe('Ethereumwallet.ethereum', () => {
           },
         },
       });
-      console.log('Mock popup postMessage calls:2');
       const accounts = await promise;
 
       // Should return Ethereum mainnet accounts (current chain)

@@ -174,10 +174,14 @@ export function extractAccountsForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string[] {
+  let accounts: string[] = [];
   if (connectionResult && connectionResult?.accounts) {
-    return connectionResult?.accounts[namespace] || [];
+    accounts = connectionResult?.accounts[namespace] || [];
   }
-  return [];
+  if (!Array.isArray(accounts)) {
+    return [];
+  }
+  return accounts;
 }
 
 /**
