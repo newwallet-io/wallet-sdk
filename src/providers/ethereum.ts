@@ -73,7 +73,6 @@ export class EthereumProvider {
 
       // Parse accounts by chain
       const allAccounts = extractAccountsForNamespace(result, 'eip155');
-      console.log('All accounts from wallet:', allAccounts);
       this._accountsByChain = {};
 
       // Accounts come as 'eip155:1:0x123...', 'eip155:56:0x456...'
@@ -89,7 +88,6 @@ export class EthereumProvider {
           this._accountsByChain[chainId].push(address);
         }
       });
-      console.log('Accounts by chain:', this._accountsByChain);
       // Store supported chains
       // this._supportedChains = result.supportedChains || ALL_EVM_CHAINS;
       this._supportedChains = ALL_EVM_CHAINS;

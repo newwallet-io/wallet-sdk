@@ -71,6 +71,7 @@ describe('Ethereumwallet.ethereum', () => {
   const walletUrl = 'http://localhost:3001/transaction_signing';
 
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     mockPopup.closed = false;
 
@@ -82,6 +83,11 @@ describe('Ethereumwallet.ethereum', () => {
     wallet = new NewWallet.default({
       walletUrl,
     });
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers(); // Add this
+    jest.useRealTimers(); // Add this
   });
 
   describe('Initialization', () => {

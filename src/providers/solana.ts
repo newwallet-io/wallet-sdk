@@ -139,7 +139,7 @@ export class SolanaProvider {
       encodedMessage = message;
     }
 
-    return this._makeSigningRequest(
+    const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
       [
         {
@@ -149,6 +149,10 @@ export class SolanaProvider {
       ],
       this._currentChain
     );
+    if (!result || typeof result.signature !== 'string') {
+      throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
+    }
+    return result.signature
   }
 
   /**
@@ -162,7 +166,7 @@ export class SolanaProvider {
     }
     // Serialize transaction
     const serialized = serializeBase64SolanaTransaction(transaction);
-    const signedData = await this._makeSigningRequest(
+    const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
       [
         {
@@ -172,8 +176,11 @@ export class SolanaProvider {
       ],
       this._currentChain
     );
-    // Deserialize the signed transaction
-    return signedData;
+    if (!result || typeof result.transaction !== 'string' || typeof result.signature !== 'string') {
+      throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
+    }
+    const deserializedTx = deserializeBase64SolanaTransaction(result.transaction)
+    return deserializedTx;
   }
 
   /**
@@ -198,12 +205,14 @@ export class SolanaProvider {
       ],
       this._currentChain
     );
+    if (!result || !Array.isArray(result.transactions)) {
+      throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing transactions array');
+    }
     // Deserialize all signed transactions
-
-    const transaction1 = result.transactions.map((tx: string) => {
+    const deserializedTxs = result.transactions.map((tx: string) => {
       return deserializeBase64SolanaTransaction(tx);
     });
-    return transaction1;
+    return deserializedTxs;
   }
 
   /**
@@ -220,7 +229,7 @@ export class SolanaProvider {
     // Serialize transaction
     const serialized = serializeBase64SolanaTransaction(transaction);
 
-    const signature = await this._makeSigningRequest(
+    const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
       [
         {
@@ -230,8 +239,10 @@ export class SolanaProvider {
       ],
       this._currentChain
     );
-
-    return signature;
+    if (!result || typeof result.signature !== 'string') {
+      throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
+    }
+    return result.signature
   }
 
   /**
