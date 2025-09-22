@@ -1,45 +1,50 @@
-// test/providers/ethereum.test.ts
-
-import { EthereumProvider } from '../src/providers/ethereum';
-import {
-  CONNECTION_METHODS,
-  EIP155_METHODS,
-  CHAIN_IDS,
-  ErrorCode,
-} from '../src/types';
-
 // Mock popup object
 const mockPopup = {
   postMessage: jest.fn(),
   closed: false,
   close: jest.fn(),
 };
+global.window = {
+  location: {
+    origin: 'http://localhost:3000',
+    hostname: 'localhost',
+  },
+  open: jest.fn().mockImplementation(() => mockPopup),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+};
+global.TextEncoder = class {
+  encode(text) {
+    return Buffer.from(text);
+  }
+};
+global.URL = class {
+  constructor(url) {
+    this.url = url;
+    this.origin = 'http://localhost:3001';
+  }
+};
+global.setInterval = jest.fn(() => 123);
+global.clearInterval = jest.fn();
 
-// Mock window
-Object.defineProperty(window, 'open', {
-  writable: true,
-  value: jest.fn(() => mockPopup)
-});
-
-// Track event listeners
-const eventListeners: { [key: string]: Function[] } = {};
-window.addEventListener = jest.fn((event: string, callback: Function) => {
+// Event listeners handling
+const eventListeners = {};
+global.window.addEventListener = (event, callback) => {
   if (!eventListeners[event]) {
     eventListeners[event] = [];
   }
   eventListeners[event].push(callback);
-}) as any;
+};
 
-window.removeEventListener = jest.fn() as any;
+global.window.removeEventListener = (event, callback) => {
+  if (eventListeners[event]) {
+    eventListeners[event] = eventListeners[event].filter((cb) => cb !== callback);
+  }
+};
 
-// Mock timers
-global.setInterval = jest.fn(() => 123) as any;
-global.clearInterval = jest.fn();
-
-// Helper to simulate wallet messages
-function simulateWalletMessage(type: string, data?: any) {
+function simulateWalletMessage(type, data = {}) {
   const mockEvent = {
-    origin: 'https://newwallet.io',
+    origin: 'http://localhost:3001',
     data: type === 'READY' ? { type: 'READY' } : data,
   };
   
@@ -48,9 +53,25 @@ function simulateWalletMessage(type: string, data?: any) {
   }
 }
 
-describe('EthereumProvider', () => {
-  let provider: EthereumProvider;
-  const walletUrl = 'https://newwallet.io/transaction_signing';
+function simulatePopupClosed() {
+  mockPopup.closed = true;
+  // Trigger the interval check manually since we're mocking setInterval
+  if (eventListeners['message'] && eventListeners['message'].length > 0) {
+    // Force the interval callback to run
+    if (typeof global.setInterval.mock.calls[0][0] === 'function') {
+      global.setInterval.mock.calls[0][0]();
+    }
+  }
+}
+const NewWallet = require('../dist/index.js');
+const { CONNECTION_METHODS,
+  EIP155_METHODS,
+  CHAIN_IDS,
+  ErrorCode, } = NewWallet;
+
+describe('Ethereumwallet.ethereum', () => {
+  let wallet;
+  const walletUrl = 'http://localhost:3001/transaction_signing';
   
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,12 +82,65 @@ describe('EthereumProvider', () => {
       eventListeners[key] = [];
     }
     
-    provider = new EthereumProvider(walletUrl);
+    wallet = new NewWallet.default({
+      walletUrl,
+    });
   });
 
+  describe('Initialization', () => {
+    test('SDK should be properly initialized', () => {
+      expect(wallet).toBeDefined();
+      expect(wallet.ethereum).toBeDefined();
+      expect(wallet.isInstalled()).toBe(true);
+    });
+
+    test('Ethereum wallet.ethereum should have request method', () => {
+      expect(typeof wallet.ethereum.request).toBe('function');
+    });
+  });
   describe('Connection', () => {
+    test('should open popup and connect successfully', async () => {
+      // Start connection process
+      const connectPromise = wallet.ethereum.request({ method: 'eth_requestAccounts' });
+
+      // The wallet should have opened a popup
+      expect(window.open).toHaveBeenCalledWith(
+        'http://localhost:3001/transaction_signing',
+        expect.any(String),
+        expect.any(String)
+      );
+
+      // Simulate the wallet sending a READY message
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
+        result: {
+          accounts: {
+            eip155: [
+              'eip155:1:0xeth1',
+              'eip155:1:0xeth2',
+              'eip155:56:0xbsc1',
+              'eip155:56:0xbsc2',
+              'eip155:8453:0xbase1',
+              'solana:1:0xsol1',
+            ]
+          },
+          chains: {
+            eip155: 'eip155:1' // Active chain is Ethereum mainnet
+          }
+        }
+      });
+      // Wait for the connection promise to resolve
+      const accounts = await connectPromise;
+
+      // Check the accounts returned
+      expect(accounts).toEqual(['0xeth1', '0xeth2']);
+      expect(mockPopup.close).toHaveBeenCalled();
+    });
     it('should connect and request all EVM chains', async () => {
-      const promise = provider.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
+      const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
       
       // Check popup opened
       expect(window.open).toHaveBeenCalledWith(
@@ -76,7 +150,7 @@ describe('EthereumProvider', () => {
       );
       
       simulateWalletMessage('READY');
-      
+      console.log('Mock popup postMessage calls:', mockPopup.postMessage.mock.calls);
       // Check requested all chains
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -94,9 +168,9 @@ describe('EthereumProvider', () => {
             })
           }
         }),
-        'https://newwallet.io'
+        'http://localhost:3001'
       );
-      
+      console.log('Mock popup postMessage calls:1');
       // Simulate response with different accounts per chain
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
@@ -117,22 +191,22 @@ describe('EthereumProvider', () => {
           }
         }
       });
-
+      console.log('Mock popup postMessage calls:2');
       const accounts = await promise;
       
       // Should return Ethereum mainnet accounts (current chain)
       expect(accounts).toEqual(['0xeth1', '0xeth2']);
-      expect(provider.isConnected()).toBe(true);
-      expect(provider.getChainId()).toBe('0x1');
+      expect(wallet.ethereum.isConnected()).toBe(true);
+      expect(wallet.ethereum.getChainId()).toBe('0x1');
       
       // Check accounts per chain
-      expect(provider.getAccountsForChain('eip155:1')).toEqual(['0xeth1', '0xeth2']);
-      expect(provider.getAccountsForChain('eip155:56')).toEqual(['0xbsc1', '0xbsc2']);
-      expect(provider.getAccountsForChain('eip155:8453')).toEqual(['0xbase1']);
+      expect(wallet.ethereum.getAccountsForChain('eip155:1')).toEqual(['0xeth1', '0xeth2']);
+      expect(wallet.ethereum.getAccountsForChain('eip155:56')).toEqual(['0xbsc1', '0xbsc2']);
+      expect(wallet.ethereum.getAccountsForChain('eip155:8453')).toEqual(['0xbase1']);
     });
 
     it('should handle wallet with active BSC chain', async () => {
-      const promise = provider.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
+      const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
       
       simulateWalletMessage('READY');
       
@@ -157,14 +231,14 @@ describe('EthereumProvider', () => {
       
       // Should return BSC accounts
       expect(accounts).toEqual(['0xbsc1', '0xbsc2']);
-      expect(provider.getChainId()).toBe('0x38'); // BSC mainnet
+      expect(wallet.ethereum.getChainId()).toBe('0x38'); // BSC mainnet
     });
   });
 
   describe('Chain switching', () => {
     beforeEach(async () => {
       // Setup connected state
-      const promise = provider.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
+      const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
       
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
@@ -193,27 +267,27 @@ describe('EthereumProvider', () => {
       const chainChangedListener = jest.fn();
       const accountsChangedListener = jest.fn();
       
-      provider.on('chainChanged', chainChangedListener);
-      provider.on('accountsChanged', accountsChangedListener);
+      wallet.ethereum.on('chainChanged', chainChangedListener);
+      wallet.ethereum.on('accountsChanged', accountsChangedListener);
       
       // Initially on Ethereum
-      expect(provider.getAccounts()).toEqual(['0xeth1']);
+      expect(wallet.ethereum.getAccounts()).toEqual(['0xeth1']);
       
       // Switch to BSC
-      await provider.request({
+      await wallet.ethereum.request({
         method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
         params: [{ chainId: '0x38' }] // BSC mainnet
       });
       
-      expect(provider.getChainId()).toBe('0x38');
-      expect(provider.getAccounts()).toEqual(['0xbsc1']);
+      expect(wallet.ethereum.getChainId()).toBe('0x38');
+      expect(wallet.ethereum.getAccounts()).toEqual(['0xbsc1']);
       expect(chainChangedListener).toHaveBeenCalledWith('0x38');
       expect(accountsChangedListener).toHaveBeenCalledWith(['0xbsc1']);
     });
 
     it('should reject unsupported chain', async () => {
       await expect(
-        provider.request({
+        wallet.ethereum.request({
           method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
           params: [{ chainId: '0x89' }] // Polygon - not supported
         })
@@ -224,7 +298,7 @@ describe('EthereumProvider', () => {
   describe('Signing methods', () => {
     beforeEach(async () => {
       // Setup connected state with different accounts per chain
-      const promise = provider.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
+      const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
       
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
@@ -244,7 +318,7 @@ describe('EthereumProvider', () => {
     });
 
     it('should sign with current chain account', async () => {
-      const promise = provider.request({
+      const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
         params: ['Hello', '0xeth1']
       });
@@ -258,7 +332,7 @@ describe('EthereumProvider', () => {
           params: ['Hello', '0xeth1'],
           chainId: 'eip155:1' // Current chain
         }),
-        'https://newwallet.io'
+        'http://localhost:3001'
       );
       
       simulateWalletMessage('response', {
@@ -274,7 +348,7 @@ describe('EthereumProvider', () => {
     it('should reject signing with wrong chain account', async () => {
       // Currently on Ethereum, try to sign with BSC account
       await expect(
-        provider.request({
+        wallet.ethereum.request({
           method: EIP155_METHODS.PERSONAL_SIGN,
           params: ['Hello', '0xbsc1'] // BSC account on Ethereum chain
         })
@@ -283,14 +357,14 @@ describe('EthereumProvider', () => {
 
     it('should sign after switching chains', async () => {
       // Switch to BSC
-      await provider.request({
+      await wallet.ethereum.request({
         method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
         params: [{ chainId: '0x38' }]
       });
       
       jest.clearAllMocks();
       
-      const promise = provider.request({
+      const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
         params: ['Hello', '0xbsc1']
       });
@@ -304,7 +378,7 @@ describe('EthereumProvider', () => {
           params: ['Hello', '0xbsc1'],
           chainId: 'eip155:56' // BSC chain
         }),
-        'https://newwallet.io'
+        'http://localhost:3001'
       );
       
       simulateWalletMessage('response', {
@@ -320,7 +394,7 @@ describe('EthereumProvider', () => {
 
   describe('eth_sendTransaction', () => {
     beforeEach(async () => {
-      const promise = provider.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
+      const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
@@ -339,7 +413,7 @@ describe('EthereumProvider', () => {
         value: '0x1000'
       };
       
-      const promise = provider.request({
+      const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
         params: [tx]
       });
@@ -352,7 +426,7 @@ describe('EthereumProvider', () => {
           params: [expect.objectContaining(tx)],
           chainId: 'eip155:1'
         }),
-        'https://newwallet.io'
+        'http://localhost:3001'
       );
       
       simulateWalletMessage('response', {
