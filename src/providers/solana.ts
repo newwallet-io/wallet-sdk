@@ -20,13 +20,13 @@ import {
 } from '../utils/connection';
 import { Transaction, VersionedTransaction, SendOptions } from '@solana/web3.js';
 import bs58 from 'bs58';
-import { serializeBase64SolanaTransaction } from '../utils/serialization';
+import {
+  serializeBase64SolanaTransaction,
+  deserializeBase64SolanaTransaction,
+} from '../utils/serialization';
 
 // All supported Solana chains
-const ALL_SOLANA_CHAINS = [
-  CHAIN_IDS.SOLANA_MAINNET,
-  CHAIN_IDS.SOLANA_TESTNET,
-];
+const ALL_SOLANA_CHAINS = [CHAIN_IDS.SOLANA_MAINNET, CHAIN_IDS.SOLANA_TESTNET];
 
 export class SolanaProvider {
   private _targetWalletUrl: string;
@@ -53,34 +53,34 @@ export class SolanaProvider {
         solana: {
           chains: ALL_SOLANA_CHAINS,
           methods: Object.values(SOLANA_METHODS),
-          events: ['connect', 'disconnect']
-        }
+          events: ['connect', 'disconnect'],
+        },
       };
 
       const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
-      
+
       this._connectionResult = result;
       this._accounts = extractAccountsForNamespace(result, 'solana');
-      
+
       if (!this._accounts.length) {
         throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
       }
-      
+
       // Use first account as primary
       this._publicKey = this._accounts[0];
-      
+
       // Store supported chains (inferred from response)
       this._supportedChains = ALL_SOLANA_CHAINS;
-      
+
       // Use wallet's active chain if provided
       const activeChain = extractChainForNamespace(result, 'solana');
       if (activeChain && this._supportedChains.includes(activeChain)) {
         this._currentChain = activeChain;
       }
-      
+
       this._connected = true;
       this._emit('connect', this._publicKey);
-      
+
       return this._publicKey;
     } catch (error) {
       this._connected = false;
@@ -141,10 +141,12 @@ export class SolanaProvider {
 
     return this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-      [{
-        message: encodedMessage,
-        pubkey: this._publicKey
-      }],
+      [
+        {
+          message: encodedMessage,
+          pubkey: this._publicKey,
+        },
+      ],
       this._currentChain
     );
   }
@@ -158,19 +160,18 @@ export class SolanaProvider {
     if (!this._connected || !this._publicKey) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
-
     // Serialize transaction
     const serialized = serializeBase64SolanaTransaction(transaction);
-
     const signedData = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
-      [{
-        transaction: serialized,
-        pubkey: this._publicKey
-      }],
+      [
+        {
+          transaction: serialized,
+          pubkey: this._publicKey,
+        },
+      ],
       this._currentChain
     );
-
     // Deserialize the signed transaction
     return signedData;
   }
@@ -184,25 +185,25 @@ export class SolanaProvider {
     if (!this._connected || !this._publicKey) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
-
     // Serialize all transactions
-    const serializedTransactions = transactions.map(tx => {
+    const serializedTransactions = transactions.map((tx) => {
       return serializeBase64SolanaTransaction(tx);
     });
-
-    const signedDataArray = await this._makeSigningRequest(
+    const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
-      [{
-        transactions: serializedTransactions,
-        pubkey: this._publicKey
-      }],
+      [
+        {
+          transactions: serializedTransactions,
+        },
+      ],
       this._currentChain
     );
-
     // Deserialize all signed transactions
-    return signedDataArray.map((signedData: string, index: number) => 
-      serializeBase64SolanaTransaction(signedData)
-    );
+
+    const transaction1 = result.transactions.map((tx: string) => {
+      return deserializeBase64SolanaTransaction(tx);
+    });
+    return transaction1;
   }
 
   /**
@@ -221,11 +222,12 @@ export class SolanaProvider {
 
     const signature = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
-      [{
-        transaction: serialized,
-        sendOptions,
-        pubkey: this._publicKey
-      }],
+      [
+        {
+          transaction: serialized,
+          sendOptions,
+        },
+      ],
       this._currentChain
     );
 
@@ -244,22 +246,18 @@ export class SolanaProvider {
 
   off(event: string, listener: Function): void {
     if (!this._eventListeners[event]) return;
-    this._eventListeners[event] = this._eventListeners[event].filter(l => l !== listener);
+    this._eventListeners[event] = this._eventListeners[event].filter((l) => l !== listener);
   }
 
   private _emit(event: string, ...args: any[]): void {
     if (!this._eventListeners[event]) return;
-    this._eventListeners[event].forEach(listener => listener(...args));
+    this._eventListeners[event].forEach((listener) => listener(...args));
   }
 
   /**
    * Generic signing request handler
    */
-  private async _makeSigningRequest(
-    method: string, 
-    params: any[], 
-    chainId: string
-  ): Promise<any> {
+  private async _makeSigningRequest(method: string, params: any[], chainId: string): Promise<any> {
     return new Promise((resolve, reject) => {
       const popup = openPopup(this._targetWalletUrl);
       if (!popup) {
@@ -271,7 +269,7 @@ export class SolanaProvider {
 
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== this._targetWalletOrigin) return;
-        
+
         const data = event.data;
 
         if (data?.type === 'READY' && !requestSent) {
@@ -286,10 +284,7 @@ export class SolanaProvider {
 
           const response = data as PostMessageResponse;
           if (isErrorResponse(response)) {
-            reject(new ProviderError(
-              response.error.code as ErrorCode,
-              response.error.message
-            ));
+            reject(new ProviderError(response.error.code as ErrorCode, response.error.message));
           } else {
             resolve(response.result);
           }

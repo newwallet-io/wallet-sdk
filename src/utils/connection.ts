@@ -27,17 +27,15 @@ export interface ConnectionResult {
  * Build required namespaces for connection request
  * Always requests BOTH mainnet and testnet chains
  */
-export function buildRequiredNamespaces(
-  networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]
-): any {
+export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]): any {
   const namespaces: any = {};
-  
+
   // Process EVM networks - always include both mainnet and testnet
-  const evmNetworks = networks.filter(n => n !== 'solana');
+  const evmNetworks = networks.filter((n) => n !== 'solana');
   if (evmNetworks.length > 0) {
     const chains: string[] = [];
-    
-    evmNetworks.forEach(network => {
+
+    evmNetworks.forEach((network) => {
       switch (network) {
         case 'ethereum':
           chains.push(CHAIN_IDS.ETHEREUM_MAINNET, CHAIN_IDS.ETHEREUM_SEPOLIA);
@@ -50,33 +48,26 @@ export function buildRequiredNamespaces(
           break;
       }
     });
-    
+
     // Add all EIP155 methods
-    const methods = [
-      ...Object.values(EIP155_METHODS),
-      'eth_accounts',
-      'eth_chainId'
-    ];
-    
+    const methods = [...Object.values(EIP155_METHODS), 'eth_accounts', 'eth_chainId'];
+
     namespaces.eip155 = {
       chains,
       methods,
       events: ['chainChanged', 'accountsChanged'],
     };
   }
-  
+
   // Process Solana - always include both mainnet and testnet
   if (networks.includes('solana')) {
     namespaces.solana = {
-      chains: [
-        CHAIN_IDS.SOLANA_MAINNET,
-        CHAIN_IDS.SOLANA_TESTNET,
-      ],
+      chains: [CHAIN_IDS.SOLANA_MAINNET, CHAIN_IDS.SOLANA_TESTNET],
       methods: Object.values(SOLANA_METHODS),
       events: ['connect', 'disconnect'],
     };
   }
-  
+
   return namespaces;
 }
 
@@ -93,21 +84,21 @@ export async function requestWalletConnection(
       reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup'));
       return;
     }
-    
+
     let isReady = false;
     let requestSent = false;
-    
+
     const handleMessage = (event: MessageEvent) => {
       // Security: Check origin
       const walletOrigin = new URL(walletUrl).origin;
       if (event.origin !== walletOrigin) return;
-      
+
       const data = event.data;
-      
+
       // Handle READY message
       if (data?.type === 'READY' && !requestSent) {
         isReady = true;
-        
+
         // Create connection request
         const request = createPostMessageRequest(
           CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
@@ -115,26 +106,28 @@ export async function requestWalletConnection(
           undefined, // No chainId for connection
           requiredNamespaces
         );
-        
+
         // Send to wallet
         popup.postMessage(request, walletOrigin);
         requestSent = true;
         return;
       }
-      
+
       // Handle connection response (JSON-RPC format)
-      if (data?.jsonrpc === '2.0' && data?.method === CONNECTION_METHODS.WALLET_REQUEST_CONNECTION) {
+      if (
+        data?.jsonrpc === '2.0' &&
+        data?.method === CONNECTION_METHODS.WALLET_REQUEST_CONNECTION
+      ) {
         cleanup();
         popup.close();
-        
+
         const response = data as PostMessageResponse;
-        
+
         if (isErrorResponse(response)) {
           const error = response.error;
-          reject(new ProviderError(
-            error.code as ErrorCode || ErrorCode.UNKNOWN_ERROR,
-            error.message
-          ));
+          reject(
+            new ProviderError((error.code as ErrorCode) || ErrorCode.UNKNOWN_ERROR, error.message)
+          );
         } else {
           // Success - extract accounts and chains
           const result = response.result as ConnectionResult;
@@ -142,27 +135,27 @@ export async function requestWalletConnection(
         }
       }
     };
-    
+
     const handleClose = () => {
       cleanup();
       if (!requestSent) {
         reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window'));
       }
     };
-    
+
     const cleanup = () => {
       clearInterval(windowChecker);
       window.removeEventListener('message', handleMessage);
     };
-    
+
     // Check if popup is closed
     const windowChecker = setInterval(() => {
       if (popup.closed) handleClose();
     }, 500);
-    
+
     // Listen for messages
     window.addEventListener('message', handleMessage);
-    
+
     // Timeout if wallet doesn't respond
     setTimeout(() => {
       if (!isReady) {
@@ -191,19 +184,19 @@ export function extractChainForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string | null {
-  return connectionResult.chains?.[namespace] || null;  // Add optional chaining
+  return connectionResult.chains?.[namespace] || null; // Add optional chaining
 }
 /**
  * Convert chain ID to hex for Ethereum compatibility
  */
 export function chainIdToHex(chainId: string): string {
   const [namespace, reference] = chainId.split(':');
-  
+
   if (namespace === 'eip155') {
     const numericId = parseInt(reference);
     return '0x' + numericId.toString(16);
   }
-  
+
   // For non-EVM chains, return as-is
   return chainId;
 }

@@ -60,9 +60,9 @@ function simulateWalletMessage(type, data = {}) {
     origin: 'http://localhost:3001',
     data: type === 'READY' ? { type: 'READY' } : data,
   };
-  
+
   if (eventListeners['message']) {
-    eventListeners['message'].forEach(listener => listener(mockEvent));
+    eventListeners['message'].forEach((listener) => listener(mockEvent));
   }
 }
 
@@ -77,25 +77,60 @@ function simulatePopupClosed() {
   }
 }
 
+export const serializeBase64SolanaTransaction = (transaction) => {
+  try {
+    const isVersionedTransaction = typeof transaction.version !== 'undefined';
+    let serializedTransaction;
+    if (isVersionedTransaction) {
+      // Versioned transaction
+      serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
+    } else {
+      // Legacy transaction
+      serializedTransaction = Buffer.from(
+        transaction.serialize({ verifySignatures: false })
+      ).toString('base64');
+    }
+    return serializedTransaction;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to serialize transaction: ${errorMessage}`);
+  }
+};
+
+export const deserializeBase64SolanaTransaction = (serializedTransaction) => {
+  console.log('deserializeBase64SolanaTransaction', serializedTransaction);
+  const transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+  // If first byte is 0x80, it's definitely a versioned transaction
+  const firstByte = transactionBuffer[0];
+  // Or In Case Transaction has a version byte after the signature
+  const versionByte = transactionBuffer[1 + 64 * firstByte];
+  const isVersioned = firstByte === 0x80 || versionByte === 0x80;
+  let transaction;
+  if (isVersioned) {
+    transaction = VersionedTransaction.deserialize(transactionBuffer);
+  } else {
+    transaction = Transaction.from(transactionBuffer);
+  }
+  console.log('deserializeBase64SolanaTransaction1', transaction);
+  return transaction;
+};
+
 const NewWallet = require('../dist/index.js');
-const { CONNECTION_METHODS,
-  EIP155_METHODS,
-  CHAIN_IDS,
-  ErrorCode, SOLANA_METHODS} = NewWallet;
+const { CONNECTION_METHODS, EIP155_METHODS, CHAIN_IDS, ErrorCode, SOLANA_METHODS } = NewWallet;
 
 describe('SolanaProvider', () => {
   let wallet;
   const walletUrl = 'http://localhost:3001/transaction_signing';
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockPopup.closed = false;
-    
+
     // Clear event listeners
     for (const key in eventListeners) {
       eventListeners[key] = [];
     }
-    
+
     wallet = new NewWallet.default({
       walletUrl,
     });
@@ -113,53 +148,45 @@ describe('SolanaProvider', () => {
     });
   });
 
-
   describe('Connection', () => {
     it('should connect and request both mainnet and testnet', async () => {
       const promise = wallet.solana.connect();
-      
+
       // Check popup opened
-      expect(window.open).toHaveBeenCalledWith(
-        walletUrl,
-        expect.any(String),
-        expect.any(String)
-      );
-      
+      expect(window.open).toHaveBeenCalledWith(walletUrl, expect.any(String), expect.any(String));
+
       simulateWalletMessage('READY');
-      
+
       // Check requested both Solana chains
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
           requiredNamespaces: {
             solana: expect.objectContaining({
-              chains: [
-                CHAIN_IDS.SOLANA_MAINNET,
-                CHAIN_IDS.SOLANA_TESTNET
-              ],
-              methods: Object.values(SOLANA_METHODS)
-            })
-          }
+              chains: [CHAIN_IDS.SOLANA_MAINNET, CHAIN_IDS.SOLANA_TESTNET],
+              methods: Object.values(SOLANA_METHODS),
+            }),
+          },
         }),
         'http://localhost:3001'
       );
-      
+
       // Simulate response with mainnet active
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['sol1pubkey', 'sol2pubkey']
+            solana: ['sol1pubkey', 'sol2pubkey'],
           },
           chains: {
-            solana: CHAIN_IDS.SOLANA_MAINNET
-          }
-        }
+            solana: CHAIN_IDS.SOLANA_MAINNET,
+          },
+        },
       });
 
       const publicKey = await promise;
-      
+
       expect(publicKey).toBe('sol1pubkey');
       expect(wallet.solana.isConnected()).toBe(true);
       expect(wallet.solana.getPublicKey()).toBe('sol1pubkey');
@@ -169,25 +196,25 @@ describe('SolanaProvider', () => {
 
     it('should handle testnet as active chain', async () => {
       const promise = wallet.solana.connect();
-      
+
       simulateWalletMessage('READY');
-      
+
       // Simulate response with testnet active
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['testpubkey']
+            solana: ['testpubkey'],
           },
           chains: {
-            solana: CHAIN_IDS.SOLANA_TESTNET
-          }
-        }
+            solana: CHAIN_IDS.SOLANA_TESTNET,
+          },
+        },
       });
 
       const publicKey = await promise;
-      
+
       expect(publicKey).toBe('testpubkey');
       expect(wallet.solana.getCurrentChain()).toBe(CHAIN_IDS.SOLANA_TESTNET);
     });
@@ -195,22 +222,22 @@ describe('SolanaProvider', () => {
     it('should emit connect event', async () => {
       const connectListener = jest.fn();
       wallet.solana.on('connect', connectListener);
-      
+
       const promise = wallet.solana.connect();
-      
+
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['sol1pubkey']
-          }
-        }
+            solana: ['sol1pubkey'],
+          },
+        },
       });
 
       await promise;
-      
+
       expect(connectListener).toHaveBeenCalledWith('sol1pubkey');
     });
   });
@@ -224,8 +251,8 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: ['sol1pubkey'] }
-        }
+          accounts: { solana: ['sol1pubkey'] },
+        },
       });
       await promise;
     });
@@ -233,9 +260,9 @@ describe('SolanaProvider', () => {
     it('should disconnect and clear state', async () => {
       const disconnectListener = jest.fn();
       wallet.solana.on('disconnect', disconnectListener);
-      
+
       await wallet.solana.disconnect();
-      
+
       expect(wallet.solana.isConnected()).toBe(false);
       expect(wallet.solana.getPublicKey()).toBe(null);
       expect(wallet.solana.getAccounts()).toEqual([]);
@@ -253,8 +280,8 @@ describe('SolanaProvider', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: { solana: ['sol1pubkey'] },
-          chains: { solana: CHAIN_IDS.SOLANA_MAINNET }
-        }
+          chains: { solana: CHAIN_IDS.SOLANA_MAINNET },
+        },
       });
       await promise;
     });
@@ -262,29 +289,31 @@ describe('SolanaProvider', () => {
     it('should sign message with Uint8Array', async () => {
       const message = new TextEncoder().encode('Hello Solana');
       const promise = wallet.solana.signMessage(message);
-      
+
       simulateWalletMessage('READY');
-      
+
       // Check message is base58 encoded
       const expectedMessage = bs58.encode(message);
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-          params: [{
-            message: expectedMessage,
-            pubkey: 'sol1pubkey'
-          }],
-          chainId: CHAIN_IDS.SOLANA_MAINNET
+          params: [
+            {
+              message: expectedMessage,
+              pubkey: 'sol1pubkey',
+            },
+          ],
+          chainId: CHAIN_IDS.SOLANA_MAINNET,
         }),
         'http://localhost:3001'
       );
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-        result: 'signature123'
+        result: 'signature123',
       });
-      
+
       const signature = await promise;
       expect(signature).toBe('signature123');
     });
@@ -292,51 +321,51 @@ describe('SolanaProvider', () => {
     it('should sign message with string', async () => {
       const message = 'Hello Solana';
       const promise = wallet.solana.signMessage(message);
-      
+
       simulateWalletMessage('READY');
-      
+
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-          params: [{
-            message: message, // String passed as-is
-            pubkey: 'sol1pubkey'
-          }]
+          params: [
+            {
+              message: message, // String passed as-is
+              pubkey: 'sol1pubkey',
+            },
+          ],
         }),
         'http://localhost:3001'
       );
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-        result: 'signature456'
+        result: 'signature456',
       });
-      
+
       const signature = await promise;
       expect(signature).toBe('signature456');
     });
 
     it('should reject if not connected', async () => {
       await wallet.solana.disconnect();
-      
-      await expect(
-        wallet.solana.signMessage('test')
-      ).rejects.toThrow('Not connected');
+
+      await expect(wallet.solana.signMessage('test')).rejects.toThrow('Not connected');
     });
   });
 
   describe('Sign Transaction', () => {
     let transaction;
-    
+    const mockKeypair = Keypair.generate();
+    const mockPublicKey = mockKeypair.publicKey.toString();
     beforeEach(async () => {
       // Create a test transaction
-      const mockKeypair = Keypair.generate();
-      const mockPublicKey = mockKeypair.publicKey.toString();
+
       transaction = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: mockKeypair.publicKey,
           toPubkey: mockKeypair.publicKey,
-          lamports: LAMPORTS_PER_SOL * 0.01
+          lamports: LAMPORTS_PER_SOL * 0.01,
         })
       );
       transaction.feePayer = mockKeypair.publicKey;
@@ -349,169 +378,187 @@ describe('SolanaProvider', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: { solana: [mockKeypair.publicKey] },
-          chains: { solana: CHAIN_IDS.SOLANA_TESTNET }
-        }
+          chains: { solana: CHAIN_IDS.SOLANA_TESTNET },
+        },
       });
       await promise;
     });
 
-    it.only('should sign transaction', async () => {
+    it('should sign transaction', async () => {
       const promise = wallet.solana.signTransaction(transaction);
-      
-    //   simulateWalletMessage('READY');
-      
-      // Check transaction is serialized
-    //   expect(mockPopup.postMessage).toHaveBeenCalledWith(
-    //     expect.objectContaining({
-    //       method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
-    //       params: [{
-    //         transaction: expect.any(String), // base58 encoded
-    //         pubkey: mockKeypair.publicKey
-    //       }],
-    //       chainId: CHAIN_IDS.SOLANA_TESTNET // Uses current chain
-    //     }),
-    //     'http://localhost:3001'
-    //   );
-      
-    //   // Mock signed transaction (base58 encoded)
-    //   const mockSignedTx = bs58.encode(Buffer.from('signed_transaction_data'));
-      
-    //   simulateWalletMessage('response', {
-    //     jsonrpc: '2.0',
-    //     method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
-    //     result: mockSignedTx
-    //   });
-      
-    //   const signedTx = await promise;
-    //   expect(signedTx).toBeDefined();
-    //   expect(signedTx).toBeInstanceOf(Transaction);
+
+      simulateWalletMessage('READY');
+
+      //   Check transaction is serialized
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+          params: [
+            {
+              transaction: expect.any(String), // base58 encoded
+              pubkey: mockKeypair.publicKey,
+            },
+          ],
+          chainId: CHAIN_IDS.SOLANA_TESTNET, // Uses current chain
+        }),
+        'http://localhost:3001'
+      );
+
+      // Mock signed transaction (base58 encoded)
+      const mockSignedTx = bs58.encode(Buffer.from('signed_transaction_data'));
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+        result: mockSignedTx,
+      });
+
+      const signedTx = await promise;
+      expect(signedTx).toBeDefined();
+      expect(signedTx).toEqual(mockSignedTx);
     });
   });
 
-//   describe('Sign All Transactions', () => {
-//     let transactions = [];
-    
-//     beforeEach(async () => {
-//       // Create test transactions
-//       transactions = [
-//         new Transaction().add(
-//           SystemProgram.transfer({
-//             fromPubkey: new PublicKey('sol1pubkey'),
-//             toPubkey: new PublicKey('recipient1'),
-//             lamports: 1000
-//           })
-//         ),
-//         new Transaction().add(
-//           SystemProgram.transfer({
-//             fromPubkey: new PublicKey('sol1pubkey'),
-//             toPubkey: new PublicKey('recipient2'),
-//             lamports: 2000
-//           })
-//         )
-//       ];
-      
-//       // Connect
-//       const promise = wallet.solana.connect();
-//       simulateWalletMessage('READY');
-//       simulateWalletMessage('response', {
-//         jsonrpc: '2.0',
-//         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-//         result: {
-//           accounts: { solana: ['sol1pubkey'] }
-//         }
-//       });
-//       await promise;
-//     });
+  describe('Sign All Transactions', () => {
+    let transactions = [];
+    const mockKeypair = Keypair.generate();
+    const mockPublicKey = mockKeypair.publicKey.toString();
+    beforeEach(async () => {
+      // Create test transactions
+      const legacyTx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        })
+      );
+      legacyTx1.feePayer = mockKeypair.publicKey;
+      legacyTx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
-//     it('should sign multiple transactions', async () => {
-//       const promise = wallet.solana.signAllTransactions(transactions);
-      
-//       simulateWalletMessage('READY');
-      
-//       expect(mockPopup.postMessage).toHaveBeenCalledWith(
-//         expect.objectContaining({
-//           method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
-//           params: [{
-//             transactions: expect.arrayContaining([
-//               expect.any(String), // First tx base58
-//               expect.any(String)  // Second tx base58
-//             ]),
-//             pubkey: 'sol1pubkey'
-//           }]
-//         }),
-//         'http://localhost:3001'
-//       );
-      
-//       // Mock signed transactions
-//       const mockSignedTxs = [
-//         bs58.encode(Buffer.from('signed_tx1')),
-//         bs58.encode(Buffer.from('signed_tx2'))
-//       ];
-      
-//       simulateWalletMessage('response', {
-//         jsonrpc: '2.0',
-//         method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
-//         result: mockSignedTxs
-//       });
-      
-//       const signedTxs = await promise;
-//       expect(signedTxs).toHaveLength(2);
-//       expect(signedTxs[0]).toBeInstanceOf(Transaction);
-//       expect(signedTxs[1]).toBeInstanceOf(Transaction);
-//     });
-//   });
+      // Create second transaction
+      const legacyTx2 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.2,
+        })
+      );
+      legacyTx2.feePayer = mockKeypair.publicKey;
+      legacyTx2.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
-//   describe('Sign and Send Transaction', () => {
-//     let transaction;
-    
-//     beforeEach(async () => {
-//       transaction = new Transaction().add(
-//         SystemProgram.transfer({
-//           fromPubkey: new PublicKey('sol1pubkey'),
-//           toPubkey: new PublicKey('recipient'),
-//           lamports: 1000
-//         })
-//       );
-      
-//       // Connect
-//       const promise = wallet.solana.connect();
-//       simulateWalletMessage('READY');
-//       simulateWalletMessage('response', {
-//         jsonrpc: '2.0',
-//         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-//         result: {
-//           accounts: { solana: ['sol1pubkey'] }
-//         }
-//       });
-//       await promise;
-//     });
+      // Prepare transactions array
+      transactions = [legacyTx1, legacyTx2];
+      // Connect
+      const promise = wallet.solana.connect();
+      simulateWalletMessage('READY');
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
+        result: {
+          accounts: { solana: [mockPublicKey] },
+        },
+      });
+      await promise;
+    });
 
-//     it('should sign and send transaction', async () => {
-//       const sendOptions = { skipPreflight: true };
-//       const promise = wallet.solana.signAndSendTransaction(transaction, sendOptions);
-      
-//       simulateWalletMessage('READY');
-      
-//       expect(mockPopup.postMessage).toHaveBeenCalledWith(
-//         expect.objectContaining({
-//           method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
-//           params: [{
-//             transaction: expect.any(String),
-//             sendOptions,
-//             pubkey: 'sol1pubkey'
-//           }]
-//         }),
-//         'http://localhost:3001'
-//       );
-      
-//       simulateWalletMessage('response', {
-//         jsonrpc: '2.0',
-//         method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
-//         result: 'txSignature123'
-//       });
-      
-//       const signature = await promise;
-//       expect(signature).toBe('txSignature123');
-//     });
-//   });
+    it('should sign multiple transactions', async () => {
+      const promise = wallet.solana.signAllTransactions(transactions);
+
+      simulateWalletMessage('READY');
+
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+          params: [
+            {
+              transactions: expect.arrayContaining([
+                expect.any(String), // First tx base58
+                expect.any(String), // Second tx base58
+              ]),
+            },
+          ],
+        }),
+        'http://localhost:3001'
+      );
+      const serializedTransactions = transactions.map((tx) => {
+        return serializeBase64SolanaTransaction(tx);
+      });
+
+      const transaction1 = serializedTransactions.map((tx) => {
+        return deserializeBase64SolanaTransaction(tx);
+      });
+
+      console.log('transaction1', transaction1);
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+        result: {
+          transactions: serializedTransactions,
+        },
+      });
+
+      const signedTxs = await promise;
+      expect(signedTxs).toHaveLength(2);
+      expect(signedTxs[0]).toBeInstanceOf(Transaction);
+      expect(signedTxs[1]).toBeInstanceOf(Transaction);
+    });
+  });
+
+  describe('Sign and Send Transaction', () => {
+    let transaction;
+    const mockKeypair = Keypair.generate();
+    const mockPublicKey = mockKeypair.publicKey.toString();
+    beforeEach(async () => {
+      transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
+      transaction.feePayer = mockKeypair.publicKey;
+      transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+      // Connect
+      const promise = wallet.solana.connect();
+      simulateWalletMessage('READY');
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
+        result: {
+          accounts: { solana: [mockKeypair.publicKey] },
+        },
+      });
+      await promise;
+    });
+
+    it('should sign and send transaction', async () => {
+      const sendOptions = { skipPreflight: true };
+      const promise = wallet.solana.signAndSendTransaction(transaction, sendOptions);
+
+      simulateWalletMessage('READY');
+
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+          params: [
+            {
+              transaction: expect.any(String),
+              sendOptions,
+            },
+          ],
+        }),
+        'http://localhost:3001'
+      );
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+        result: 'txSignature123',
+      });
+
+      const signature = await promise;
+      expect(signature).toBe('txSignature123');
+    });
+  });
 });

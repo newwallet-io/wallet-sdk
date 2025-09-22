@@ -44,7 +44,7 @@ export const CHAIN_IDS = {
   BSC_TESTNET: 'eip155:97',
   BASE_MAINNET: 'eip155:8453',
   BASE_SEPOLIA: 'eip155:84532',
-  
+
   // Solana chains
   SOLANA_MAINNET: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
   SOLANA_TESTNET: 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z',
@@ -59,10 +59,10 @@ export const CHAIN_IDS = {
  */
 export interface PostMessageRequest {
   // Standard fields
-  method: string;              // WalletConnect method name
-  params?: any;                // Method parameters
-  chainId?: string;           // Chain ID for signing (e.g., 'eip155:1')
-  
+  method: string; // WalletConnect method name
+  params?: any; // Method parameters
+  chainId?: string; // Chain ID for signing (e.g., 'eip155:1')
+
   // Connection specific
   requiredNamespaces?: {
     [key: string]: {
@@ -71,11 +71,11 @@ export interface PostMessageRequest {
       events?: string[];
     };
   };
-  
+
   // Metadata
-  origin: string;             // dApp origin
-  timestamp?: number;         // Request timestamp
-  id?: string | number;       // Request ID
+  origin: string; // dApp origin
+  timestamp?: number; // Request timestamp
+  id?: string | number; // Request ID
 }
 
 /**
@@ -84,13 +84,14 @@ export interface PostMessageRequest {
 export interface PostMessageResponse {
   jsonrpc: '2.0';
   id: string | number;
-  result?: any;               // Success result
-  error?: {                  // Error result
+  result?: any; // Success result
+  error?: {
+    // Error result
     code: number;
     message: string;
     data?: any;
   };
-  method?: string;            // Include method for clarity
+  method?: string; // Include method for clarity
 }
 
 // ============================================
@@ -134,9 +135,9 @@ export function parseWalletConnectChainId(chainId: string): {
   network?: Network;
 } {
   const [namespace, reference] = chainId.split(':');
-  
+
   let network: Network | undefined;
-  
+
   if (namespace === 'eip155') {
     const chainNum = parseInt(reference);
     if (chainNum === 1 || chainNum === 11155111) {
@@ -149,7 +150,7 @@ export function parseWalletConnectChainId(chainId: string): {
   } else if (namespace === 'solana') {
     network = Network.SOLANA;
   }
-  
+
   return { namespace, reference, network };
 }
 
@@ -164,13 +165,14 @@ export function isConnectionMethod(method: string): boolean {
  * Get namespace from method
  */
 export function getNamespaceFromMethod(method: string): 'eip155' | 'solana' | 'unknown' {
-  if (Object.values(EIP155_METHODS).includes(method as any) || 
-      method.startsWith('eth_') || 
-      method === 'personal_sign') {
+  if (
+    Object.values(EIP155_METHODS).includes(method as any) ||
+    method.startsWith('eth_') ||
+    method === 'personal_sign'
+  ) {
     return 'eip155';
   }
-  if (Object.values(SOLANA_METHODS).includes(method as any) || 
-      method.startsWith('solana_')) {
+  if (Object.values(SOLANA_METHODS).includes(method as any) || method.startsWith('solana_')) {
     return 'solana';
   }
   return 'unknown';
@@ -186,14 +188,14 @@ export enum ErrorCode {
   UNAUTHORIZED = 4100,
   UNSUPPORTED_METHOD = 4200,
   DISCONNECTED = 4900,
-  
+
   // Standard JSON-RPC errors
   PARSE_ERROR = -32700,
   INVALID_REQUEST = -32600,
   METHOD_NOT_FOUND = -32601,
   INVALID_PARAMS = -32602,
   INTERNAL_ERROR = -32603,
-  
+
   // Application errors
   INVALID_INPUT = -32000,
   RESOURCE_NOT_FOUND = -32001,
@@ -202,7 +204,7 @@ export enum ErrorCode {
   METHOD_NOT_SUPPORTED = -32004,
   LIMIT_EXCEEDED = -32005,
   VERSION_NOT_SUPPORTED = -32006,
-  
+
   UNKNOWN_ERROR = -1,
 }
 
@@ -251,17 +253,15 @@ export class ProviderError extends Error {
  * Build required namespaces for connection request
  * Always requests BOTH mainnet and testnet chains
  */
-export function buildRequiredNamespaces(
-  networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]
-): any {
+export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]): any {
   const namespaces: any = {};
-  
+
   // Process EVM networks - always include both mainnet and testnet
-  const evmNetworks = networks.filter(n => n !== 'solana');
+  const evmNetworks = networks.filter((n) => n !== 'solana');
   if (evmNetworks.length > 0) {
     const chains: string[] = [];
-    
-    evmNetworks.forEach(network => {
+
+    evmNetworks.forEach((network) => {
       switch (network) {
         case 'ethereum':
           chains.push(CHAIN_IDS.ETHEREUM_MAINNET, CHAIN_IDS.ETHEREUM_SEPOLIA);
@@ -274,33 +274,26 @@ export function buildRequiredNamespaces(
           break;
       }
     });
-    
+
     // Add all EIP155 methods
-    const methods = [
-      ...Object.values(EIP155_METHODS),
-      'eth_accounts',
-      'eth_chainId'
-    ];
-    
+    const methods = [...Object.values(EIP155_METHODS), 'eth_accounts', 'eth_chainId'];
+
     namespaces.eip155 = {
       chains,
       methods,
       events: ['chainChanged', 'accountsChanged'],
     };
   }
-  
+
   // Process Solana - always include both mainnet and testnet
   if (networks.includes('solana')) {
     namespaces.solana = {
-      chains: [
-        CHAIN_IDS.SOLANA_MAINNET,
-        CHAIN_IDS.SOLANA_TESTNET,
-      ],
+      chains: [CHAIN_IDS.SOLANA_MAINNET, CHAIN_IDS.SOLANA_TESTNET],
       methods: Object.values(SOLANA_METHODS),
       events: ['connect', 'disconnect'],
     };
   }
-  
+
   return namespaces;
 }
 
@@ -369,13 +362,17 @@ export function createErrorResponse(
 /**
  * Check if response is an error
  */
-export function isErrorResponse(response: PostMessageResponse): response is PostMessageResponse & { error: NonNullable<PostMessageResponse['error']> } {
+export function isErrorResponse(
+  response: PostMessageResponse
+): response is PostMessageResponse & { error: NonNullable<PostMessageResponse['error']> } {
   return 'error' in response && response.error !== undefined;
 }
 
 /**
  * Check if response is successful
  */
-export function isSuccessResponse(response: PostMessageResponse): response is PostMessageResponse & { result: any } {
+export function isSuccessResponse(
+  response: PostMessageResponse
+): response is PostMessageResponse & { result: any } {
   return 'result' in response && !isErrorResponse(response);
 }

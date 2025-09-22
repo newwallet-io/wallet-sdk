@@ -7,20 +7,20 @@ import {
   Network,
   PostMessageRequest,
   PostMessageResponse,
-  
+
   // Method constants
   CONNECTION_METHODS,
   EIP155_METHODS,
   SOLANA_METHODS,
-  
+
   // Chain IDs
   CHAIN_IDS,
-  
+
   // Error handling
   ErrorCode,
   ProviderError,
   getErrorMessage,
-  
+
   // Utility functions
   createPostMessageRequest,
   createSuccessResponse,
@@ -49,16 +49,16 @@ export interface NewWalletOptions {
 class NewWallet {
   /** Ethereum provider - handles Ethereum, BSC, and Base chains */
   readonly ethereum: EthereumProvider;
-  
+
   /** Solana provider - handles Solana mainnet and testnet */
   readonly solana: SolanaProvider;
-  
+
   private _walletUrl: string;
 
   constructor(options: NewWalletOptions = {}) {
     // Set wallet URL with default
     this._walletUrl = options.walletUrl || 'https://newwallet.io/transaction_signing';
-    
+
     // Initialize providers
     this.ethereum = new EthereumProvider(this._walletUrl);
     this.solana = new SolanaProvider(this._walletUrl);
@@ -84,8 +84,8 @@ class NewWallet {
    * Equivalent to: wallet.ethereum.request({ method: 'eth_requestAccounts' })
    */
   async connectEthereum(): Promise<string[]> {
-    return this.ethereum.request({ 
-      method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS 
+    return this.ethereum.request({
+      method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS,
     });
   }
 
@@ -106,25 +106,25 @@ export {
   // Providers
   EthereumProvider,
   SolanaProvider,
-  
+
   // Types
   Network,
   PostMessageRequest,
   PostMessageResponse,
-  
+
   // Method constants for direct usage
   CONNECTION_METHODS,
   EIP155_METHODS,
   SOLANA_METHODS,
-  
+
   // Chain IDs for reference
   CHAIN_IDS,
-  
+
   // Error handling
   ErrorCode,
   ProviderError,
   getErrorMessage,
-  
+
   // Utility functions
   createPostMessageRequest,
   createSuccessResponse,

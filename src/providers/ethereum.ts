@@ -48,8 +48,8 @@ export class EthereumProvider {
   }
 
   /**
- * Get accounts for current chain
- */
+   * Get accounts for current chain
+   */
   private get _accounts(): string[] {
     return this._accountsByChain[this._currentChainId] || [];
   }
@@ -62,13 +62,9 @@ export class EthereumProvider {
       const namespaces = {
         eip155: {
           chains: ALL_EVM_CHAINS,
-          methods: [
-            ...Object.values(EIP155_METHODS),
-            'eth_accounts',
-            'eth_chainId'
-          ],
-          events: ['chainChanged', 'accountsChanged']
-        }
+          methods: [...Object.values(EIP155_METHODS), 'eth_accounts', 'eth_chainId'],
+          events: ['chainChanged', 'accountsChanged'],
+        },
       };
 
       const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
@@ -81,7 +77,7 @@ export class EthereumProvider {
       this._accountsByChain = {};
 
       // Accounts come as 'eip155:1:0x123...', 'eip155:56:0x456...'
-      allAccounts.forEach(accountStr => {
+      allAccounts.forEach((accountStr) => {
         const parts = accountStr.split(':');
         if (parts.length >= 3) {
           const chainId = `${parts[0]}:${parts[1]}`; // 'eip155:1'
@@ -123,7 +119,6 @@ export class EthereumProvider {
     }
   }
 
-
   /**
    * Switch chain - updates current accounts too
    */
@@ -137,10 +132,7 @@ export class EthereumProvider {
     const requestedChainWC = `eip155:${requestedChainNum}`;
 
     if (!this._supportedChains.includes(requestedChainWC)) {
-      throw new ProviderError(
-        ErrorCode.INVALID_PARAMS,
-        `Chain ${requestedChainHex} not supported`
-      );
+      throw new ProviderError(ErrorCode.INVALID_PARAMS, `Chain ${requestedChainHex} not supported`);
     }
 
     const previousAccounts = this._accounts;
@@ -181,8 +173,6 @@ export class EthereumProvider {
       this._currentChainId
     );
   }
-
-
 
   /**
    * Sign transaction
@@ -271,10 +261,7 @@ export class EthereumProvider {
 
           const response = data as PostMessageResponse;
           if (isErrorResponse(response)) {
-            reject(new ProviderError(
-              response.error.code as ErrorCode,
-              response.error.message
-            ));
+            reject(new ProviderError(response.error.code as ErrorCode, response.error.message));
           } else {
             resolve(response.result);
           }
@@ -367,12 +354,12 @@ export class EthereumProvider {
 
   off(event: string, listener: Function): void {
     if (!this._eventListeners[event]) return;
-    this._eventListeners[event] = this._eventListeners[event].filter(l => l !== listener);
+    this._eventListeners[event] = this._eventListeners[event].filter((l) => l !== listener);
   }
 
   private _emit(event: string, ...args: any[]): void {
     if (!this._eventListeners[event]) return;
-    this._eventListeners[event].forEach(listener => listener(...args));
+    this._eventListeners[event].forEach((listener) => listener(...args));
   }
 
   /**

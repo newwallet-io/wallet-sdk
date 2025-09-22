@@ -8,31 +8,31 @@ export function openPopup(url: string): Window | null {
   if (typeof window === 'undefined') {
     throw new Error('Window is not defined');
   }
-  
+
   const popupName = `newwallet-popup-${Date.now()}`;
   const width = 400;
   const height = 600;
-  
+
   // Center the popup
   const left = (window.screen?.width || 1024 - width) / 2;
   const top = (window.screen?.height || 768 - height) / 2;
-  
+
   const popup = window.open(
     url,
     popupName,
     `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
   );
-  
+
   // In test environment, window.open might be mocked
   if (!popup && process.env.NODE_ENV !== 'test') {
     throw new Error('Failed to open wallet popup. Please allow popups for this site.');
   }
-  
+
   // Focus the popup if it exists
   if (popup && popup.focus) {
     popup.focus();
   }
-  
+
   return popup;
 }
 

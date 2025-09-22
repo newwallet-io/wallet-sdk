@@ -47,9 +47,9 @@ function simulateWalletMessage(type, data = {}) {
     origin: 'http://localhost:3001',
     data: type === 'READY' ? { type: 'READY' } : data,
   };
-  
+
   if (eventListeners['message']) {
-    eventListeners['message'].forEach(listener => listener(mockEvent));
+    eventListeners['message'].forEach((listener) => listener(mockEvent));
   }
 }
 
@@ -64,24 +64,21 @@ function simulatePopupClosed() {
   }
 }
 const NewWallet = require('../dist/index.js');
-const { CONNECTION_METHODS,
-  EIP155_METHODS,
-  CHAIN_IDS,
-  ErrorCode, } = NewWallet;
+const { CONNECTION_METHODS, EIP155_METHODS, CHAIN_IDS, ErrorCode } = NewWallet;
 
 describe('Ethereumwallet.ethereum', () => {
   let wallet;
   const walletUrl = 'http://localhost:3001/transaction_signing';
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockPopup.closed = false;
-    
+
     // Clear event listeners
     for (const key in eventListeners) {
       eventListeners[key] = [];
     }
-    
+
     wallet = new NewWallet.default({
       walletUrl,
     });
@@ -125,12 +122,12 @@ describe('Ethereumwallet.ethereum', () => {
               'eip155:56:0xbsc2',
               'eip155:8453:0xbase1',
               'solana:1:0xsol1',
-            ]
+            ],
           },
           chains: {
-            eip155: 'eip155:1' // Active chain is Ethereum mainnet
-          }
-        }
+            eip155: 'eip155:1', // Active chain is Ethereum mainnet
+          },
+        },
       });
       // Wait for the connection promise to resolve
       const accounts = await connectPromise;
@@ -141,14 +138,10 @@ describe('Ethereumwallet.ethereum', () => {
     });
     it('should connect and request all EVM chains', async () => {
       const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
-      
+
       // Check popup opened
-      expect(window.open).toHaveBeenCalledWith(
-        walletUrl,
-        expect.any(String),
-        expect.any(String)
-      );
-      
+      expect(window.open).toHaveBeenCalledWith(walletUrl, expect.any(String), expect.any(String));
+
       simulateWalletMessage('READY');
       console.log('Mock popup postMessage calls:', mockPopup.postMessage.mock.calls);
       // Check requested all chains
@@ -164,9 +157,9 @@ describe('Ethereumwallet.ethereum', () => {
                 CHAIN_IDS.BSC_TESTNET,
                 CHAIN_IDS.BASE_MAINNET,
                 CHAIN_IDS.BASE_SEPOLIA,
-              ]
-            })
-          }
+              ],
+            }),
+          },
         }),
         'http://localhost:3001'
       );
@@ -184,21 +177,21 @@ describe('Ethereumwallet.ethereum', () => {
               'eip155:56:0xbsc2',
               'eip155:8453:0xbase1',
               'solana:1:0xsol1',
-            ]
+            ],
           },
           chains: {
-            eip155: 'eip155:1' // Active chain is Ethereum mainnet
-          }
-        }
+            eip155: 'eip155:1', // Active chain is Ethereum mainnet
+          },
+        },
       });
       console.log('Mock popup postMessage calls:2');
       const accounts = await promise;
-      
+
       // Should return Ethereum mainnet accounts (current chain)
       expect(accounts).toEqual(['0xeth1', '0xeth2']);
       expect(wallet.ethereum.isConnected()).toBe(true);
       expect(wallet.ethereum.getChainId()).toBe('0x1');
-      
+
       // Check accounts per chain
       expect(wallet.ethereum.getAccountsForChain('eip155:1')).toEqual(['0xeth1', '0xeth2']);
       expect(wallet.ethereum.getAccountsForChain('eip155:56')).toEqual(['0xbsc1', '0xbsc2']);
@@ -207,28 +200,24 @@ describe('Ethereumwallet.ethereum', () => {
 
     it('should handle wallet with active BSC chain', async () => {
       const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
-      
+
       simulateWalletMessage('READY');
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-              'eip155:56:0xbsc2',
-            ]
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1', 'eip155:56:0xbsc2'],
           },
           chains: {
-            eip155: 'eip155:56' // Active chain is BSC
-          }
-        }
+            eip155: 'eip155:56', // Active chain is BSC
+          },
+        },
       });
 
       const accounts = await promise;
-      
+
       // Should return BSC accounts
       expect(accounts).toEqual(['0xbsc1', '0xbsc2']);
       expect(wallet.ethereum.getChainId()).toBe('0x38'); // BSC mainnet
@@ -239,46 +228,38 @@ describe('Ethereumwallet.ethereum', () => {
     beforeEach(async () => {
       // Setup connected state
       const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
-      
+
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-              'eip155:8453:0xbase1',
-            ]
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1', 'eip155:8453:0xbase1'],
           },
-          supportedChains: [
-            'eip155:1',
-            'eip155:56', 
-            'eip155:8453'
-          ]
-        }
+          supportedChains: ['eip155:1', 'eip155:56', 'eip155:8453'],
+        },
       });
-      
+
       await promise;
     });
 
     it('should switch chains and update accounts', async () => {
       const chainChangedListener = jest.fn();
       const accountsChangedListener = jest.fn();
-      
+
       wallet.ethereum.on('chainChanged', chainChangedListener);
       wallet.ethereum.on('accountsChanged', accountsChangedListener);
-      
+
       // Initially on Ethereum
       expect(wallet.ethereum.getAccounts()).toEqual(['0xeth1']);
-      
+
       // Switch to BSC
       await wallet.ethereum.request({
         method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
-        params: [{ chainId: '0x38' }] // BSC mainnet
+        params: [{ chainId: '0x38' }], // BSC mainnet
       });
-      
+
       expect(wallet.ethereum.getChainId()).toBe('0x38');
       expect(wallet.ethereum.getAccounts()).toEqual(['0xbsc1']);
       expect(chainChangedListener).toHaveBeenCalledWith('0x38');
@@ -289,7 +270,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
-          params: [{ chainId: '0x89' }] // Polygon - not supported
+          params: [{ chainId: '0x89' }], // Polygon - not supported
         })
       ).rejects.toThrow('not supported');
     });
@@ -299,48 +280,45 @@ describe('Ethereumwallet.ethereum', () => {
     beforeEach(async () => {
       // Setup connected state with different accounts per chain
       const promise = wallet.ethereum.request({ method: CONNECTION_METHODS.ETH_REQUEST_ACCOUNTS });
-      
+
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-            ]
-          }
-        }
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1'],
+          },
+        },
       });
-      
+
       await promise;
     });
 
     it('should sign with current chain account', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: ['Hello', '0xeth1']
+        params: ['Hello', '0xeth1'],
       });
-      
+
       simulateWalletMessage('READY');
-      
+
       // Check chainId is included
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: EIP155_METHODS.PERSONAL_SIGN,
           params: ['Hello', '0xeth1'],
-          chainId: 'eip155:1' // Current chain
+          chainId: 'eip155:1', // Current chain
         }),
         'http://localhost:3001'
       );
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        result: '0xsignature'
+        result: '0xsignature',
       });
-      
+
       const signature = await promise;
       expect(signature).toBe('0xsignature');
     });
@@ -350,7 +328,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.PERSONAL_SIGN,
-          params: ['Hello', '0xbsc1'] // BSC account on Ethereum chain
+          params: ['Hello', '0xbsc1'], // BSC account on Ethereum chain
         })
       ).rejects.toThrow('not available on chain');
     });
@@ -359,34 +337,34 @@ describe('Ethereumwallet.ethereum', () => {
       // Switch to BSC
       await wallet.ethereum.request({
         method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
-        params: [{ chainId: '0x38' }]
+        params: [{ chainId: '0x38' }],
       });
-      
+
       jest.clearAllMocks();
-      
+
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: ['Hello', '0xbsc1']
+        params: ['Hello', '0xbsc1'],
       });
-      
+
       simulateWalletMessage('READY');
-      
+
       // Check BSC chainId is used
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: EIP155_METHODS.PERSONAL_SIGN,
           params: ['Hello', '0xbsc1'],
-          chainId: 'eip155:56' // BSC chain
+          chainId: 'eip155:56', // BSC chain
         }),
         'http://localhost:3001'
       );
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        result: '0xbsc_signature'
+        result: '0xbsc_signature',
       });
-      
+
       const signature = await promise;
       expect(signature).toBe('0xbsc_signature');
     });
@@ -400,8 +378,8 @@ describe('Ethereumwallet.ethereum', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { eip155: ['eip155:1:0xeth1'] }
-        }
+          accounts: { eip155: ['eip155:1:0xeth1'] },
+        },
       });
       await promise;
     });
@@ -410,31 +388,31 @@ describe('Ethereumwallet.ethereum', () => {
       const tx = {
         from: '0xeth1',
         to: '0xrecipient',
-        value: '0x1000'
+        value: '0x1000',
       };
-      
+
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        params: [tx]
+        params: [tx],
       });
-      
+
       simulateWalletMessage('READY');
-      
+
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           method: EIP155_METHODS.ETH_SEND_TRANSACTION,
           params: [expect.objectContaining(tx)],
-          chainId: 'eip155:1'
+          chainId: 'eip155:1',
         }),
         'http://localhost:3001'
       );
-      
+
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        result: '0xtxhash'
+        result: '0xtxhash',
       });
-      
+
       const txHash = await promise;
       expect(txHash).toBe('0xtxhash');
     });
