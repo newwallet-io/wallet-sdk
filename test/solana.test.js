@@ -69,12 +69,7 @@ function simulateWalletMessage(type, data = {}) {
 function simulatePopupClosed() {
   mockPopup.closed = true;
   // Trigger the interval check manually since we're mocking setInterval
-  if (eventListeners['message'] && eventListeners['message'].length > 0) {
-    // Force the interval callback to run
-    if (typeof global.setInterval.mock.calls[0][0] === 'function') {
-      global.setInterval.mock.calls[0][0]();
-    }
-  }
+  jest.advanceTimersByTime(500);
 }
 
 export const serializeBase64SolanaTransaction = (transaction) => {
@@ -531,6 +526,133 @@ describe('SolanaProvider', () => {
 
       await expect(wallet.solana.signMessage('test')).rejects.toThrow('Not connected');
     });
+    it('should handle very long message', async () => {
+      const longMessage = 'x'.repeat(10000);
+      const promise = wallet.solana.signMessage(longMessage);
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: { signature: 'longSig' },
+      });
+
+      const signature = await promise;
+      expect(signature).toBe('longSig');
+    });
+
+    it('should handle special characters in message', async () => {
+      const specialMessage = '🚀 Unicode & special <chars> "quotes" \'apostrophe\'';
+      const promise = wallet.solana.signMessage(specialMessage);
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: { signature: 'specialSig' },
+      });
+
+      const signature = await promise;
+      expect(signature).toBe('specialSig');
+    });
+
+    it('should handle Buffer as Uint8Array', async () => {
+      const buffer = Buffer.from('Hello Buffer', 'utf-8');
+      const promise = wallet.solana.signMessage(buffer);
+      simulateWalletMessage('READY');
+
+      const expectedMessage = bs58.encode(buffer);
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: [
+            {
+              message: expectedMessage,
+              pubkey: 'sol1pubkey', // Should match the connected pubkey
+            },
+          ],
+        }),
+        'http://localhost:3001'
+      );
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: { signature: 'bufferSig' },
+      });
+
+      const signature = await promise;
+      expect(signature).toBe('bufferSig');
+    });
+
+    it('should throw on null signature in response', async () => {
+      const promise = wallet.solana.signMessage('test');
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: { signature: null },
+      });
+
+      await expect(promise).rejects.toThrow('Invalid response: missing signature');
+    });
+
+    it('should throw on undefined signature in response', async () => {
+      const promise = wallet.solana.signMessage('test');
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: {}, // signature field missing
+      });
+
+      await expect(promise).rejects.toThrow('Invalid response: missing signature');
+    });
+
+    it('should handle user closing popup during signing', async () => {
+      const promise = wallet.solana.signMessage('test');
+      simulateWalletMessage('READY');
+      simulatePopupClosed();
+
+      await expect(promise).rejects.toThrow('User closed popup');
+    });
+
+    it('should handle error response from wallet', async () => {
+      const promise = wallet.solana.signMessage('test');
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        error: {
+          code: 4100,
+          message: 'User denied message signature',
+        },
+      });
+
+      await expect(promise).rejects.toThrow('User denied message signature');
+    });
+
+    it('should include correct chain ID in request', async () => {
+      const promise = wallet.solana.signMessage('test');
+      simulateWalletMessage('READY');
+
+      expect(mockPopup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: CHAIN_IDS.SOLANA_MAINNET,
+        }),
+        'http://localhost:3001'
+      );
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+        result: { signature: 'sig' },
+      });
+
+      await promise;
+    });
   });
 
   describe('Sign Transaction', () => {
@@ -563,7 +685,7 @@ describe('SolanaProvider', () => {
       await promise;
     });
 
-    it('should sign transaction', async () => {
+    it('should sign legacy transaction', async () => {
       const promise = wallet.solana.signTransaction(transaction);
 
       simulateWalletMessage('READY');
@@ -598,6 +720,88 @@ describe('SolanaProvider', () => {
       const signedTx = await promise;
       expect(signedTx).toBeDefined();
       expect(signedTx).toBeInstanceOf(Transaction);
+    });
+
+    it('should handle versioned transaction', async () => {
+      const mockKeypair = Keypair.generate();
+      const mockPublicKey = mockKeypair.publicKey.toString();
+      const instructions = [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: LAMPORTS_PER_SOL * 0.1,
+        }),
+      ];
+      const messageV0 = new TransactionMessage({
+        payerKey: mockKeypair.publicKey,
+        recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+        instructions,
+      }).compileToV0Message();
+      const versionedTx = new VersionedTransaction(messageV0);
+
+      const promise = wallet.solana.signTransaction(versionedTx);
+      simulateWalletMessage('READY');
+
+      const serialized = serializeBase64SolanaTransaction(versionedTx);
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+        result: { transaction: serialized, signature: 'signature123' },
+      });
+
+      const result = await promise;
+      expect(result).toBeInstanceOf(VersionedTransaction);
+    });
+
+    it('should handle popup closed during signing', async () => {
+      const transaction = new Transaction();
+      transaction.feePayer = mockKeypair.publicKey;
+      transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const promise = wallet.solana.signTransaction(transaction);
+      simulateWalletMessage('READY');
+
+      mockPopup.closed = true;
+      jest.advanceTimersByTime(500);
+
+      await expect(promise).rejects.toThrow('User closed popup');
+    });
+
+    it('should handle user rejection', async () => {
+      const transaction = new Transaction();
+      transaction.feePayer = mockKeypair.publicKey;
+      transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const promise = wallet.solana.signTransaction(transaction);
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+        error: {
+          code: 4001,
+          message: 'User rejected transaction',
+        },
+      });
+
+      await expect(promise).rejects.toThrow('User rejected transaction');
+    });
+
+    it('should throw on invalid base64 transaction in response', async () => {
+      const transaction = new Transaction();
+      transaction.feePayer = mockKeypair.publicKey;
+      transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+
+      const promise = wallet.solana.signTransaction(transaction);
+      simulateWalletMessage('READY');
+
+      simulateWalletMessage('response', {
+        jsonrpc: '2.0',
+        method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+        result: { transaction: 'invalid-base64!' },
+      });
+
+      await expect(promise).rejects.toThrow();
     });
   });
 
@@ -683,6 +887,93 @@ describe('SolanaProvider', () => {
       expect(signedTxs[0]).toBeInstanceOf(Transaction);
       expect(signedTxs[1]).toBeInstanceOf(Transaction);
     });
+
+    it('should handle versioned transactions', async () => {
+    // Create versioned transactions
+    const messageV0 = new TransactionMessage({
+      payerKey: mockKeypair.publicKey,
+      recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+      instructions: [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      ],
+    }).compileToV0Message();
+    
+    const versionedTx1 = new VersionedTransaction(messageV0);
+    const versionedTx2 = new VersionedTransaction(messageV0);
+    
+    const promise = wallet.solana.signAllTransactions([versionedTx1, versionedTx2]);
+    simulateWalletMessage('READY');
+    
+    const serializedTxs = [versionedTx1, versionedTx2].map(tx => 
+      serializeBase64SolanaTransaction(tx)
+    );
+    
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+      result: { transactions: serializedTxs }
+    });
+    
+    const results = await promise;
+    expect(results).toHaveLength(2);
+    expect(results[0]).toBeInstanceOf(VersionedTransaction);
+    expect(results[1]).toBeInstanceOf(VersionedTransaction);
+  });
+
+  it('should throw on invalid response', async () => {
+    const tx1 = new Transaction();
+    tx1.feePayer = mockKeypair.publicKey;
+    tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAllTransactions([tx1]);
+    simulateWalletMessage('READY');
+    
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+      result: { transactions: 'not-an-array' }  // Invalid format
+    });
+    
+    await expect(promise).rejects.toThrow('Invalid response: missing transactions array');
+  });
+
+  it('should handle user rejection', async () => {
+    const tx1 = new Transaction();
+    tx1.feePayer = mockKeypair.publicKey;
+    tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAllTransactions([tx1]);
+    simulateWalletMessage('READY');
+    
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+      error: {
+        code: 4001,
+        message: 'User rejected signing'
+      }
+    });
+    
+    await expect(promise).rejects.toThrow('User rejected signing');
+  });
+
+  it('should handle popup closed during signing', async () => {
+    const tx1 = new Transaction();
+    tx1.feePayer = mockKeypair.publicKey;
+    tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAllTransactions([tx1]);
+    simulateWalletMessage('READY');
+    
+    mockPopup.closed = true;
+    jest.advanceTimersByTime(500);
+    
+    await expect(promise).rejects.toThrow('User closed popup');
+  });
   });
 
   describe('Sign and Send Transaction', () => {
@@ -740,5 +1031,83 @@ describe('SolanaProvider', () => {
       const signature = await promise;
       expect(signature).toBe('txSignature123');
     });
+
+    it('should handle versioned transaction', async () => {
+    const messageV0 = new TransactionMessage({
+      payerKey: mockKeypair.publicKey,
+      recentBlockhash: '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG',
+      instructions: [
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      ],
+    }).compileToV0Message();
+    
+    const versionedTx = new VersionedTransaction(messageV0);
+    const promise = wallet.solana.signAndSendTransaction(versionedTx);
+    
+    simulateWalletMessage('READY');
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+      result: { signature: 'versionedTxSignature' }
+    });
+    
+    const signature = await promise;
+    expect(signature).toBe('versionedTxSignature');
+  });
+
+  it('should throw on invalid response', async () => {
+    const transaction = new Transaction();
+    transaction.feePayer = mockKeypair.publicKey;
+    transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAndSendTransaction(transaction);
+    simulateWalletMessage('READY');
+    
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+      result: {}  // Missing signature field
+    });
+    
+    await expect(promise).rejects.toThrow('Invalid response: missing signature');
+  });
+
+  it('should handle user rejection', async () => {
+    const transaction = new Transaction();
+    transaction.feePayer = mockKeypair.publicKey;
+    transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAndSendTransaction(transaction);
+    simulateWalletMessage('READY');
+    
+    simulateWalletMessage('response', {
+      jsonrpc: '2.0',
+      method: SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+      error: {
+        code: 4001,
+        message: 'User rejected transaction'
+      }
+    });
+    
+    await expect(promise).rejects.toThrow('User rejected transaction');
+  });
+
+  it('should handle popup closed during signing', async () => {
+    const transaction = new Transaction();
+    transaction.feePayer = mockKeypair.publicKey;
+    transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
+    
+    const promise = wallet.solana.signAndSendTransaction(transaction);
+    simulateWalletMessage('READY');
+    
+    mockPopup.closed = true;
+    jest.advanceTimersByTime(500);
+    
+    await expect(promise).rejects.toThrow('User closed popup');
+  });
   });
 });
