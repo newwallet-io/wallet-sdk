@@ -61,7 +61,6 @@ export class SolanaProvider {
 
       this._connectionResult = result;
       this._accounts = extractAccountsForNamespace(result, 'solana');
-
       if (!this._accounts.length) {
         throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
       }
@@ -152,7 +151,7 @@ export class SolanaProvider {
     if (!result || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
     }
-    return result.signature
+    return result.signature;
   }
 
   /**
@@ -179,7 +178,7 @@ export class SolanaProvider {
     if (!result || typeof result.transaction !== 'string' || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
     }
-    const deserializedTx = deserializeBase64SolanaTransaction(result.transaction)
+    const deserializedTx = deserializeBase64SolanaTransaction(result.transaction);
     return deserializedTx;
   }
 
@@ -206,7 +205,10 @@ export class SolanaProvider {
       this._currentChain
     );
     if (!result || !Array.isArray(result.transactions)) {
-      throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing transactions array');
+      throw new ProviderError(
+        ErrorCode.INTERNAL_ERROR,
+        'Invalid response: missing transactions array'
+      );
     }
     // Deserialize all signed transactions
     const deserializedTxs = result.transactions.map((tx: string) => {
@@ -242,7 +244,7 @@ export class SolanaProvider {
     if (!result || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
     }
-    return result.signature
+    return result.signature;
   }
 
   /**

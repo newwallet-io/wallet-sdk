@@ -174,7 +174,10 @@ export function extractAccountsForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string[] {
-  return connectionResult.accounts[namespace] || [];
+  if (connectionResult && connectionResult?.accounts) {
+    return connectionResult?.accounts[namespace] || [];
+  }
+  return [];
 }
 
 /**
@@ -184,7 +187,10 @@ export function extractChainForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string | null {
-  return connectionResult.chains?.[namespace] || null; // Add optional chaining
+  if (connectionResult && connectionResult?.chains) {
+    return connectionResult.chains?.[namespace] || null;
+  }
+  return null; // Add optional chaining
 }
 /**
  * Convert chain ID to hex for Ethereum compatibility
