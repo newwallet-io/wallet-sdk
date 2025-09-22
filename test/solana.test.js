@@ -754,7 +754,13 @@ describe('SolanaProvider', () => {
     });
 
     it('should handle popup closed during signing', async () => {
-      const transaction = new Transaction();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
       transaction.feePayer = mockKeypair.publicKey;
       transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
@@ -768,7 +774,13 @@ describe('SolanaProvider', () => {
     });
 
     it('should handle user rejection', async () => {
-      const transaction = new Transaction();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
       transaction.feePayer = mockKeypair.publicKey;
       transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
@@ -788,7 +800,13 @@ describe('SolanaProvider', () => {
     });
 
     it('should throw on invalid base64 transaction in response', async () => {
-      const transaction = new Transaction();
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
       transaction.feePayer = mockKeypair.publicKey;
       transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
 
@@ -925,7 +943,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should throw on invalid response', async () => {
-    const tx1 = new Transaction();
+    const tx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     tx1.feePayer = mockKeypair.publicKey;
     tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
@@ -942,7 +966,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should handle user rejection', async () => {
-    const tx1 = new Transaction();
+    const tx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     tx1.feePayer = mockKeypair.publicKey;
     tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
@@ -962,7 +992,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should handle popup closed during signing', async () => {
-    const tx1 = new Transaction();
+    const tx1 = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     tx1.feePayer = mockKeypair.publicKey;
     tx1.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
@@ -1060,7 +1096,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should throw on invalid response', async () => {
-    const transaction = new Transaction();
+    const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     transaction.feePayer = mockKeypair.publicKey;
     transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
@@ -1077,7 +1119,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should handle user rejection', async () => {
-    const transaction = new Transaction();
+    const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     transaction.feePayer = mockKeypair.publicKey;
     transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
@@ -1097,7 +1145,13 @@ describe('SolanaProvider', () => {
   });
 
   it('should handle popup closed during signing', async () => {
-    const transaction = new Transaction();
+    const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mockKeypair.publicKey,
+          toPubkey: mockKeypair.publicKey,
+          lamports: 1000,
+        })
+      );
     transaction.feePayer = mockKeypair.publicKey;
     transaction.recentBlockhash = '9XeJipgDr8nt2bMewXmATkEL5AbuUTnQBoUGmt5vpYPG';
     
