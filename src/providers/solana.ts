@@ -1,561 +1,239 @@
+// src/providers/solana.ts - Updated without isTestnet
+
 import {
-  SolanaMessageType,
+  PostMessageRequest,
+  PostMessageResponse,
+  SOLANA_METHODS,
+  CONNECTION_METHODS,
+  CHAIN_IDS,
   ErrorCode,
-  MessageRequest,
-  MessageResponse,
-  getErrorMessage,
   ProviderError,
+  isErrorResponse,
+  createPostMessageRequest,
 } from '../types';
 import { openPopup } from '../utils';
-import { serializeSolanaTransaction, deserializeSolanaTransaction } from '../utils/serialization';
-import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import {
+  requestWalletConnection,
+  extractAccountsForNamespace,
+  extractChainForNamespace,
+  ConnectionResult,
+} from '../utils/connection';
+import { Transaction, VersionedTransaction, SendOptions } from '@solana/web3.js';
+import bs58 from 'bs58';
+import { serializeBase64SolanaTransaction } from '../utils/serialization';
+
+// All supported Solana chains
+const ALL_SOLANA_CHAINS = [
+  CHAIN_IDS.SOLANA_MAINNET,
+  CHAIN_IDS.SOLANA_TESTNET,
+];
 
 export class SolanaProvider {
   private _targetWalletUrl: string;
   private _targetWalletOrigin: string;
   private _connected: boolean = false;
   private _publicKey: string | null = null;
+  private _accounts: string[] = [];
+  private _supportedChains: string[] = [];
+  private _currentChain: string = CHAIN_IDS.SOLANA_MAINNET;
   private _eventListeners: { [event: string]: Function[] } = {};
+  private _connectionResult: ConnectionResult | null = null;
 
   constructor(targetWalletUrl: string) {
     this._targetWalletUrl = targetWalletUrl;
     this._targetWalletOrigin = new URL(targetWalletUrl).origin;
   }
 
-  private _buildRequest(type: SolanaMessageType, payload?: any): MessageRequest {
-    return {
-      type,
-      network: 'solana',
-      timestamp: Date.now(),
-      payload,
-    };
-  }
-
   /**
-   * Connect to the wallet
-   * @returns A promise that resolves to the public key of the connected wallet
+   * Connect to wallet - requests both mainnet and testnet
    */
   async connect(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const popup = openPopup(this._targetWalletUrl);
-      if (!popup) {
-        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup.'));
-        return;
+    try {
+      const namespaces = {
+        solana: {
+          chains: ALL_SOLANA_CHAINS,
+          methods: Object.values(SOLANA_METHODS),
+          events: ['connect', 'disconnect']
+        }
+      };
+
+      const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
+      
+      this._connectionResult = result;
+      this._accounts = extractAccountsForNamespace(result, 'solana');
+      
+      if (!this._accounts.length) {
+        throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
       }
-
-      let posted = false;
-
-      const handleMessage = (event: MessageEvent<MessageResponse>) => {
-        const { data, origin } = event;
-
-        if (
-          data.type === SolanaMessageType.READY &&
-          origin === this._targetWalletOrigin &&
-          !posted
-        ) {
-          const request = this._buildRequest(SolanaMessageType.CONNECT_WALLET);
-          popup.postMessage(request, this._targetWalletOrigin);
-          posted = true;
-        }
-
-        if (data.type === SolanaMessageType.CONNECT_WALLET && origin === this._targetWalletOrigin) {
-          cleanup();
-          popup.close();
-
-          if (data.payload.success) {
-            // Get the public key from the response
-            const publicKey = data.payload.result.publicKey;
-
-            // Update internal state
-            this._connected = true;
-            this._publicKey = publicKey;
-
-            // Emit the connect event
-            this._emit('connect', publicKey);
-
-            // Resolve the promise with the public key
-            resolve(publicKey);
-          } else {
-            const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
-            reject(new ProviderError(errorCode, data.payload.message));
-          }
-        }
-      };
-
-      const handleClose = () => {
-        cleanup();
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
-      };
-
-      const cleanup = () => {
-        clearInterval(windowChecker);
-        window.removeEventListener('message', handleMessage);
-      };
-
-      const windowChecker = setInterval(() => {
-        if (popup.closed) handleClose();
-      }, 500);
-
-      window.addEventListener('message', handleMessage);
-    });
+      
+      // Use first account as primary
+      this._publicKey = this._accounts[0];
+      
+      // Store supported chains (inferred from response)
+      this._supportedChains = ALL_SOLANA_CHAINS;
+      
+      // Use wallet's active chain if provided
+      const activeChain = extractChainForNamespace(result, 'solana');
+      if (activeChain && this._supportedChains.includes(activeChain)) {
+        this._currentChain = activeChain;
+      }
+      
+      this._connected = true;
+      this._emit('connect', this._publicKey);
+      
+      return this._publicKey;
+    } catch (error) {
+      this._connected = false;
+      this._publicKey = null;
+      this._accounts = [];
+      throw error;
+    }
   }
 
   /**
-   * Disconnect from the wallet
+   * Disconnect from wallet
    */
   async disconnect(): Promise<void> {
     if (this._connected) {
       this._connected = false;
       this._publicKey = null;
+      this._accounts = [];
       this._emit('disconnect');
     }
   }
 
   /**
-   * Check if wallet is connected
-   * @returns true if connected, false otherwise
+   * Check connection status
    */
   isConnected(): boolean {
     return this._connected;
   }
 
   /**
-   * Get the public key of the connected wallet
-   * @returns The public key as a string, or null if not connected
+   * Get public key
    */
   getPublicKey(): string | null {
     return this._publicKey;
   }
 
   /**
-   * Sign a message
-   * @param message The message to sign, as a Uint8Array
-   * @returns A promise that resolves to the signature
+   * Get all connected accounts
    */
-  async signMessage(message: Uint8Array): Promise<string> {
-    if (!this._connected) {
-      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
-    }
-
-    if (!this._publicKey) {
-      throw new ProviderError(
-        ErrorCode.UNAUTHORIZED,
-        'No public key available. Please connect first.'
-      );
-    }
-
-    return new Promise((resolve, reject) => {
-      const popup = openPopup(this._targetWalletUrl);
-      if (!popup) {
-        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup.'));
-        return;
-      }
-
-      let posted = false;
-
-      const handleMessage = (event: MessageEvent<MessageResponse>) => {
-        const { data, origin } = event;
-
-        if (
-          data.type === SolanaMessageType.READY &&
-          origin === this._targetWalletOrigin &&
-          !posted
-        ) {
-          // Convert Uint8Array to a format suitable for postMessage
-          const messageBase64 = btoa(String.fromCharCode.apply(null, [...message]));
-
-          const request = this._buildRequest(SolanaMessageType.SIGN_MESSAGE, {
-            message: messageBase64,
-            encoding: 'base64',
-          });
-
-          popup.postMessage(request, this._targetWalletOrigin);
-          posted = true;
-        }
-
-        if (data.type === SolanaMessageType.SIGN_MESSAGE && origin === this._targetWalletOrigin) {
-          cleanup();
-          popup.close();
-
-          if (data.payload.success) {
-            // Return just the signature to match Phantom's interface
-            resolve(data.payload.result.signature);
-          } else {
-            const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
-            reject(new ProviderError(errorCode, data.payload.message));
-          }
-        }
-      };
-
-      const handleClose = () => {
-        cleanup();
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
-      };
-
-      const cleanup = () => {
-        clearInterval(windowChecker);
-        window.removeEventListener('message', handleMessage);
-      };
-
-      const windowChecker = setInterval(() => {
-        if (popup.closed) handleClose();
-      }, 500);
-
-      window.addEventListener('message', handleMessage);
-    });
+  getAccounts(): string[] {
+    return this._accounts;
   }
 
   /**
-   * Verify that a transaction can be signed by the connected account
-   * @param transaction The transaction to verify (Transaction or VersionedTransaction)
-   * @throws ProviderError if the transaction doesn't belong to the connected account
+   * Sign a message
    */
-  private _verifyTransactionOwnership(transaction: any): void {
-    if (!this._publicKey) {
-      throw new ProviderError(
-        ErrorCode.UNAUTHORIZED,
-        'No public key available. Please connect first.'
-      );
+  async signMessage(message: Uint8Array | string): Promise<string> {
+    if (!this._connected || !this._publicKey) {
+      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
 
-    // Handle LegacyTransaction
-    if (transaction.feePayer) {
-      // Handle both PublicKey objects and our mock objects
-      const feePayer =
-        typeof transaction.feePayer.toString === 'function'
-          ? transaction.feePayer.toString()
-          : transaction.feePayer;
-
-      if (feePayer !== this._publicKey) {
-        throw new ProviderError(
-          ErrorCode.UNAUTHORIZED,
-          'Transaction fee payer does not match connected account.'
-        );
-      }
-      return;
+    // Convert message to base58 if it's Uint8Array
+    let encodedMessage: string;
+    if (message instanceof Uint8Array) {
+      encodedMessage = bs58.encode(message);
+    } else {
+      encodedMessage = message;
     }
 
-    // Handle VersionedTransaction
-    if (transaction.message && transaction.message.staticAccountKeys) {
-      // For VersionedTransaction
-      if (transaction.message.staticAccountKeys.length > 0) {
-        // Handle both PublicKey objects and strings
-        const firstKey =
-          typeof transaction.message.staticAccountKeys[0].toString === 'function'
-            ? transaction.message.staticAccountKeys[0].toString()
-            : transaction.message.staticAccountKeys[0];
-
-        if (firstKey !== this._publicKey) {
-          throw new ProviderError(
-            ErrorCode.UNAUTHORIZED,
-            'Transaction first signer does not match connected account.'
-          );
-        }
-        return;
-      }
-    }
-
-    // If we can't verify transaction ownership
-    throw new ProviderError(
-      ErrorCode.UNAUTHORIZED,
-      'Unable to verify transaction ownership. Please ensure the transaction is properly constructed.'
+    return this._makeSigningRequest(
+      SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
+      [{
+        message: encodedMessage,
+        pubkey: this._publicKey
+      }],
+      this._currentChain
     );
   }
 
   /**
    * Sign a transaction
-   * @param transaction The transaction to sign
-   * @returns A promise that resolves to the signed transaction
    */
   async signTransaction(
     transaction: Transaction | VersionedTransaction
   ): Promise<Transaction | VersionedTransaction> {
-    if (!this._connected) {
-      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
+    if (!this._connected || !this._publicKey) {
+      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
-    // Verify transaction ownership
-    this._verifyTransactionOwnership(transaction);
 
-    return new Promise((resolve, reject) => {
-      const popup = openPopup(this._targetWalletUrl);
-      if (!popup) {
-        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup.'));
-        return;
-      }
+    // Serialize transaction
+    const serialized = serializeBase64SolanaTransaction(transaction);
 
-      let posted = false;
-      const handleMessage = (event: MessageEvent<MessageResponse>) => {
-        const { data, origin } = event;
-        if (
-          data.type === SolanaMessageType.READY &&
-          origin === this._targetWalletOrigin &&
-          !posted
-        ) {
-          try {
-            // Serialize the transaction
-            const { serializedTransaction, isVersionedTransaction, encoding } =
-              serializeSolanaTransaction(transaction);
-            const request = this._buildRequest(SolanaMessageType.SIGN_TRANSACTION, {
-              serializedTransaction,
-              isVersionedTransaction,
-              encoding,
-            });
-            popup.postMessage(request, this._targetWalletOrigin);
-            posted = true;
-          } catch (err) {
-            cleanup();
-            popup.close();
-            reject(err);
-          }
-        }
+    const signedData = await this._makeSigningRequest(
+      SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
+      [{
+        transaction: serialized,
+        pubkey: this._publicKey
+      }],
+      this._currentChain
+    );
 
-        if (
-          data.type === SolanaMessageType.SIGN_TRANSACTION &&
-          origin === this._targetWalletOrigin
-        ) {
-          cleanup();
-          popup.close();
-
-          if (data.payload.success) {
-            const serializedTransaction = data.payload.result.serializedTransaction;
-            const isVersionedTransaction = data.payload.result.isVersionedTransaction || false;
-            const encoding = data.payload.result.encoding || 'base64';
-
-            // Use the existing deserializeSolanaTransaction utility function
-            const signedTransaction = deserializeSolanaTransaction(
-              serializedTransaction,
-              isVersionedTransaction,
-              encoding
-            );
-
-            // Return the deserialized transaction object
-            resolve(signedTransaction);
-          } else {
-            const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
-            reject(new ProviderError(errorCode, data.payload.message));
-          }
-        }
-      };
-
-      const handleClose = () => {
-        cleanup();
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
-      };
-
-      const cleanup = () => {
-        clearInterval(windowChecker);
-        window.removeEventListener('message', handleMessage);
-      };
-
-      const windowChecker = setInterval(() => {
-        if (popup.closed) handleClose();
-      }, 500);
-
-      window.addEventListener('message', handleMessage);
-    });
+    // Deserialize the signed transaction
+    return signedData;
   }
 
   /**
    * Sign multiple transactions
-   * @param transactions An array of transactions to sign
-   * @returns A promise that resolves to an array of signed transactions
    */
-  async signAllTransactions(transactions: any[]): Promise<any[]> {
-    if (!this._connected) {
-      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
+  async signAllTransactions(
+    transactions: (Transaction | VersionedTransaction)[]
+  ): Promise<(Transaction | VersionedTransaction)[]> {
+    if (!this._connected || !this._publicKey) {
+      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
 
-    // Verify all transactions
-    for (let i = 0; i < transactions.length; i++) {
-      try {
-        this._verifyTransactionOwnership(transactions[i]);
-      } catch (error) {
-        // Add context about which transaction failed
-        if (error instanceof ProviderError) {
-          throw new ProviderError(error.code, `Transaction at index ${i}: ${error.message}`);
-        }
-        throw error;
-      }
-    }
-
-    return new Promise((resolve, reject) => {
-      const popup = openPopup(this._targetWalletUrl);
-      if (!popup) {
-        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup.'));
-        return;
-      }
-
-      let posted = false;
-
-      const handleMessage = (event: MessageEvent<MessageResponse>) => {
-        const { data, origin } = event;
-
-        if (
-          data.type === SolanaMessageType.READY &&
-          origin === this._targetWalletOrigin &&
-          !posted
-        ) {
-          try {
-            // Prepare transactions for transfer in a single try block
-            const serializedTransactions = transactions.map((tx, index) => {
-              const { serializedTransaction, isVersionedTransaction, encoding } =
-                serializeSolanaTransaction(tx);
-
-              return {
-                serializedTransaction,
-                isVersionedTransaction,
-                encoding,
-                index,
-              };
-            });
-
-            const request = this._buildRequest(SolanaMessageType.SIGN_ALL_TRANSACTIONS, {
-              serializedTransactions,
-            });
-
-            popup.postMessage(request, this._targetWalletOrigin);
-            posted = true;
-          } catch (err) {
-            cleanup();
-            popup.close();
-            reject(err);
-          }
-        }
-
-        if (
-          data.type === SolanaMessageType.SIGN_ALL_TRANSACTIONS &&
-          origin === this._targetWalletOrigin
-        ) {
-          cleanup();
-          popup.close();
-
-          if (data.payload.success) {
-            // Get the array of serialized signed transactions
-            const signedTransactionsData: string[] = data.payload.result.signedTransactions || [];
-
-            // Deserialize each transaction
-            const deserializedTransactions = signedTransactionsData.map(
-              (txData: any, index: number) => {
-                // Deserialize the transaction
-                return deserializeSolanaTransaction(
-                  txData.serializedTransaction,
-                  txData.isVersionedTransaction,
-                  txData.encoding
-                );
-              }
-            );
-
-            // Return the array of deserialized transaction objects
-            resolve(deserializedTransactions);
-          } else {
-            const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
-            reject(new ProviderError(errorCode, data.payload.message));
-          }
-        }
-      };
-
-      const handleClose = () => {
-        cleanup();
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
-      };
-
-      const cleanup = () => {
-        clearInterval(windowChecker);
-        window.removeEventListener('message', handleMessage);
-      };
-
-      const windowChecker = setInterval(() => {
-        if (popup.closed) handleClose();
-      }, 500);
-
-      window.addEventListener('message', handleMessage);
+    // Serialize all transactions
+    const serializedTransactions = transactions.map(tx => {
+      return serializeBase64SolanaTransaction(tx);
     });
+
+    const signedDataArray = await this._makeSigningRequest(
+      SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
+      [{
+        transactions: serializedTransactions,
+        pubkey: this._publicKey
+      }],
+      this._currentChain
+    );
+
+    // Deserialize all signed transactions
+    return signedDataArray.map((signedData: string, index: number) => 
+      serializeBase64SolanaTransaction(signedData)
+    );
   }
 
   /**
    * Sign and send a transaction
-   * @param transaction The transaction to sign and send
-   * @returns A promise that resolves to the transaction signature
    */
-  async signAndSendTransaction(transaction: Transaction | VersionedTransaction): Promise<string> {
-    if (!this._connected) {
-      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected. Please connect first.');
+  async signAndSendTransaction(
+    transaction: Transaction | VersionedTransaction,
+    sendOptions?: SendOptions
+  ): Promise<string> {
+    if (!this._connected || !this._publicKey) {
+      throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
-    // Verify transaction ownership
-    this._verifyTransactionOwnership(transaction);
 
-    return new Promise((resolve, reject) => {
-      const popup = openPopup(this._targetWalletUrl);
-      if (!popup) {
-        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup.'));
-        return;
-      }
+    // Serialize transaction
+    const serialized = serializeBase64SolanaTransaction(transaction);
 
-      let posted = false;
-      const handleMessage = (event: MessageEvent<MessageResponse>) => {
-        const { data, origin } = event;
+    const signature = await this._makeSigningRequest(
+      SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
+      [{
+        transaction: serialized,
+        sendOptions,
+        pubkey: this._publicKey
+      }],
+      this._currentChain
+    );
 
-        if (
-          data.type === SolanaMessageType.READY &&
-          origin === this._targetWalletOrigin &&
-          !posted
-        ) {
-          try {
-            // Serialize the transaction with the same format as signTransaction
-            const { serializedTransaction, isVersionedTransaction, encoding } =
-              serializeSolanaTransaction(transaction);
-
-            const request = this._buildRequest(SolanaMessageType.SIGN_AND_SEND_TRANSACTION, {
-              serializedTransaction,
-              isVersionedTransaction,
-              encoding,
-            });
-            popup.postMessage(request, this._targetWalletOrigin);
-            posted = true;
-          } catch (err) {
-            cleanup();
-            popup.close();
-            reject(err);
-          }
-        }
-
-        if (
-          data.type === SolanaMessageType.SIGN_AND_SEND_TRANSACTION &&
-          origin === this._targetWalletOrigin
-        ) {
-          cleanup();
-          popup.close();
-          if (data.payload.success) {
-            resolve(data.payload.result.signature);
-          } else {
-            const errorCode = data.payload.errorCode || ErrorCode.UNKNOWN_ERROR;
-            reject(new ProviderError(errorCode, data.payload.message));
-          }
-        }
-      };
-
-      const handleClose = () => {
-        cleanup();
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
-      };
-
-      const cleanup = () => {
-        clearInterval(windowChecker);
-        window.removeEventListener('message', handleMessage);
-      };
-
-      const windowChecker = setInterval(() => {
-        if (popup.closed) handleClose();
-      }, 500);
-
-      window.addEventListener('message', handleMessage);
-    });
+    return signature;
   }
 
   /**
-   * Add an event listener
-   * @param event The event name
-   * @param listener The event listener
+   * Event handling
    */
   on(event: string, listener: Function): void {
     if (!this._eventListeners[event]) {
@@ -564,23 +242,89 @@ export class SolanaProvider {
     this._eventListeners[event].push(listener);
   }
 
-  /**
-   * Remove an event listener
-   * @param event The event name
-   * @param listener The event listener to remove
-   */
   off(event: string, listener: Function): void {
     if (!this._eventListeners[event]) return;
-    this._eventListeners[event] = this._eventListeners[event].filter((l) => l !== listener);
+    this._eventListeners[event] = this._eventListeners[event].filter(l => l !== listener);
+  }
+
+  private _emit(event: string, ...args: any[]): void {
+    if (!this._eventListeners[event]) return;
+    this._eventListeners[event].forEach(listener => listener(...args));
   }
 
   /**
-   * Emit an event
-   * @param event The event name
-   * @param args Arguments to pass to the listeners
+   * Generic signing request handler
    */
-  private _emit(event: string, ...args: any[]): void {
-    if (!this._eventListeners[event]) return;
-    this._eventListeners[event].forEach((listener) => listener(...args));
+  private async _makeSigningRequest(
+    method: string, 
+    params: any[], 
+    chainId: string
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const popup = openPopup(this._targetWalletUrl);
+      if (!popup) {
+        reject(new ProviderError(ErrorCode.INTERNAL_ERROR, 'Failed to open popup'));
+        return;
+      }
+
+      let requestSent = false;
+
+      const handleMessage = (event: MessageEvent) => {
+        if (event.origin !== this._targetWalletOrigin) return;
+        
+        const data = event.data;
+
+        if (data?.type === 'READY' && !requestSent) {
+          const request = createPostMessageRequest(method, params, chainId);
+          popup.postMessage(request, this._targetWalletOrigin);
+          requestSent = true;
+        }
+
+        if (data?.jsonrpc === '2.0' && data?.method === method) {
+          cleanup();
+          popup.close();
+
+          const response = data as PostMessageResponse;
+          if (isErrorResponse(response)) {
+            reject(new ProviderError(
+              response.error.code as ErrorCode,
+              response.error.message
+            ));
+          } else {
+            resolve(response.result);
+          }
+        }
+      };
+
+      const handleClose = () => {
+        cleanup();
+        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed popup'));
+      };
+
+      const cleanup = () => {
+        clearInterval(windowChecker);
+        window.removeEventListener('message', handleMessage);
+      };
+
+      const windowChecker = setInterval(() => {
+        if (popup.closed) handleClose();
+      }, 500);
+
+      window.addEventListener('message', handleMessage);
+    });
+  }
+
+  /**
+   * Get current chain
+   */
+  getCurrentChain(): string {
+    return this._currentChain;
+  }
+
+  /**
+   * Get supported chains
+   */
+  getSupportedChains(): string[] {
+    return this._supportedChains;
   }
 }

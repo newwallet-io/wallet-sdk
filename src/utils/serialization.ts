@@ -1,210 +1,111 @@
-// src/utils/serialization.ts
+// src/utils/serialization.ts - Using bs58 and specific serialization functions
 
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
 import { ethers } from 'ethers';
 import { ProviderError, ErrorCode } from '../types';
 import { Buffer } from 'buffer';
-
 /**
- * Serialize an Ethereum transaction request for transfer via postMessage
- * @param transactionRequest The Ethereum transaction request to serialize
- * @returns The serialized transaction data with encoding information
+ * Encode a message for Solana signing using bs58
  */
-export function serializeEthereumTransaction(transactionRequest: ethers.TransactionRequest): {
-  serializedTransaction: string;
-  encoding: string;
-} {
-  try {
-    const serializedTransaction = JSON.stringify(transactionRequest, (key, value) => {
-      // Handle BigInt values by converting them to strings with a marker
-      if (typeof value === 'bigint') {
-        return { type: 'bigint', value: value.toString() };
-      }
-      // Handle ethers.js Address objects
-      if (
-        value &&
-        typeof value === 'object' &&
-        value.constructor &&
-        value.constructor.name === 'Address'
-      ) {
-        return value.toString();
-      }
-      return value;
-    });
-    return { serializedTransaction, encoding: 'json' };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to serialize Ethereum transaction: ${errorMessage}`
-    );
+export function encodeSolanaMessage(message: Uint8Array | string): string {
+  // If it's a string, convert to Uint8Array first
+  if (typeof message === 'string') {
+    const encoder = new TextEncoder();
+    return bs58.encode(encoder.encode(message));
   }
+  // If it's already Uint8Array, encode directly
+  return bs58.encode(message);
 }
 
 /**
- * Deserialize an Ethereum transaction from a serialized string
- * @param serializedTransaction The serialized transaction string
- * @param encoding The encoding format (e.g., 'json')
- * @returns The deserialized transaction request
+ * Decode a Solana message from bs58
  */
-export function deserializeEthereumTransaction(
-  serializedTransaction: string,
-  encoding: string
-): ethers.TransactionRequest {
-  if (encoding !== 'json') {
-    throw new ProviderError(ErrorCode.INTERNAL_ERROR, `Unsupported encoding format: ${encoding}`);
-  }
-
-  try {
-    return JSON.parse(serializedTransaction, (key, value) => {
-      // Convert bigint markers back to BigInt
-      if (value && typeof value === 'object' && value.type === 'bigint') {
-        return BigInt(value.value);
-      }
-      return value;
-    });
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to deserialize Ethereum transaction: ${errorMessage}`
-    );
-  }
+export function decodeSolanaMessage(encodedMessage: string): Uint8Array {
+  return bs58.decode(encodedMessage);
 }
 
 /**
- * Serialize a Solana transaction for transfer via postMessage
- * @param transaction The Solana transaction to serialize (Transaction or VersionedTransaction)
- * @returns The serialized transaction data with metadata
+ * Convert Ethereum transaction to plain object for JSON serialization
  */
-export function serializeSolanaTransaction(transaction: any): {
-  serializedTransaction: string;
-  isVersionedTransaction: boolean;
-  encoding: string;
-} {
-  try {
-    const isVersionedTransaction = typeof transaction.version !== 'undefined';
+export function ethereumTransactionToPlainObject(
+  tx: ethers.TransactionRequest
+): Record<string, any> {
+  // Remove undefined values and convert BigInt to string
+  const plainTx: Record<string, any> = {};
+  
+  if (tx.from) plainTx.from = tx.from.toString();
+  if (tx.to) plainTx.to = tx.to.toString();
+  if (tx.value) plainTx.value = tx.value.toString();
+  if (tx.data) plainTx.data = tx.data;
+  if (tx.nonce !== undefined) plainTx.nonce = tx.nonce;
+  if (tx.gasLimit) plainTx.gasLimit = tx.gasLimit.toString();
+  if (tx.gasPrice) plainTx.gasPrice = tx.gasPrice.toString();
+  if (tx.maxFeePerGas) plainTx.maxFeePerGas = tx.maxFeePerGas.toString();
+  if (tx.maxPriorityFeePerGas) plainTx.maxPriorityFeePerGas = tx.maxPriorityFeePerGas.toString();
+  if (tx.chainId) plainTx.chainId = tx.chainId;
+  
+  return plainTx;
+}
 
-    let serializedTransaction: string;
-    if (isVersionedTransaction) {
-      // Versioned transaction
-      serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
-    } else {
-      // Legacy transaction
-      serializedTransaction = Buffer.from(
-        (transaction as Transaction).serialize({ verifySignatures: false })
-      ).toString('base64');
+export const serializeBase64SolanaTransaction = (transaction: any): string => {
+    try {
+        const isVersionedTransaction = typeof transaction.version !== 'undefined';
+
+        let serializedTransaction: string;
+        if (isVersionedTransaction) {
+            // Versioned transaction
+            serializedTransaction = Buffer.from(transaction.serialize()).toString('base64');
+        } else {
+            // Legacy transaction
+            serializedTransaction = Buffer.from((transaction as Transaction).serialize()).toString(
+                'base64',
+            );
+        }
+        return serializedTransaction;
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to serialize transaction: ${errorMessage}`);
     }
-    return {
-      serializedTransaction,
-      isVersionedTransaction,
-      encoding: 'base64',
-    };
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to serialize transaction: ${errorMessage}`
-    );
-  }
-}
+};
 
-/**
- * Deserialize a Solana transaction from a serialized string
- * @param serializedTransaction The serialized transaction string
- * @param isVersionedTransaction Whether it's a versioned transaction
- * @param encoding The encoding format (should be 'base64')
- * @returns The deserialized Transaction or VersionedTransaction
- */
-export function deserializeSolanaTransaction(
-  serializedTransaction: string,
-  isVersionedTransaction: boolean,
-  encoding: string
-): Transaction | VersionedTransaction {
-  if (encoding !== 'base64') {
-    throw new ProviderError(ErrorCode.INTERNAL_ERROR, `Unsupported encoding format: ${encoding}`);
-  }
-
-  try {
-    const buffer = Buffer.from(serializedTransaction, 'base64');
-
-    if (isVersionedTransaction) {
-      return VersionedTransaction.deserialize(buffer);
+export const deserializeBase64SolanaTransaction = (
+    serializedTransaction: string,
+): Transaction | VersionedTransaction => {
+    const transactionBuffer = Buffer.from(serializedTransaction, 'base64');
+    // If first byte is 0x80, it's definitely a versioned transaction
+    const firstByte = transactionBuffer[0];
+    // Or In Case Transaction has a version byte after the signature
+    const versionByte = transactionBuffer[1 + 64 * firstByte];
+    const isVersioned = firstByte === 0x80 || versionByte === 0x80;
+    let transaction;
+    if (isVersioned) {
+        transaction = VersionedTransaction.deserialize(transactionBuffer);
     } else {
-      return Transaction.from(buffer);
+        transaction = Transaction.from(transactionBuffer);
     }
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to deserialize Solana transaction: ${errorMessage}`
-    );
-  }
-}
+    return transaction;
+};
 
-/**
- * Serialize a message to base64 for transfer via postMessage
- * @param message The message to serialize (string or Uint8Array)
- * @returns The serialized message with encoding information
- */
-export function serializeMessage(message: string | Uint8Array): {
-  serializedMessage: string;
-  encoding: string;
-} {
-  try {
-    if (typeof message === 'string') {
-      // For Ethereum: Keep strings as-is or use UTF-8 encoding
-      return {
-        serializedMessage: message,
-        encoding: 'utf8',
-      };
-    } else {
-      // For Solana or binary data: Convert to base64
-      const base64Message = btoa(String.fromCharCode.apply(null, [...message]));
-      return {
-        serializedMessage: base64Message,
-        encoding: 'base64',
-      };
-    }
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to serialize message: ${errorMessage}`
-    );
-  }
-}
+export function decodeMessage(encodedMessage: any): string | null {
+    if (!encodedMessage) return encodedMessage;
 
-/**
- * Deserialize a message from its serialized form
- * @param serializedMessage The serialized message
- * @param encoding The encoding format ('utf8' or 'base64')
- * @returns The deserialized message (string or Uint8Array)
- */
-export function deserializeMessage(
-  serializedMessage: string,
-  encoding: string
-): string | Uint8Array {
-  try {
-    if (encoding === 'utf8') {
-      // String message
-      return serializedMessage;
-    } else if (encoding === 'base64') {
-      // Binary message in base64
-      const binaryString = atob(serializedMessage);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes;
-    } else {
-      throw new ProviderError(ErrorCode.INTERNAL_ERROR, `Unsupported encoding format: ${encoding}`);
+    // Base64 pattern check
+    const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+    try {
+        if (base64Pattern.test(encodedMessage)) {
+            // It looks like base64
+            const decoded = atob(encodedMessage);
+            return decoded;
+        } else {
+            // Try BS58 decode
+            const decoded = bs58.decode(encodedMessage);
+            return new TextDecoder().decode(decoded);
+        }
+    } catch (error) {
+        // If both fail, return original
+        console.warn('Failed to decode message:', error);
+        return encodedMessage;
     }
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    throw new ProviderError(
-      ErrorCode.INTERNAL_ERROR,
-      `Failed to deserialize message: ${errorMessage}`
-    );
-  }
 }
