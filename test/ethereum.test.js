@@ -235,9 +235,9 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['sol1']  // Missing eip155
-          }
-        }
+            solana: ['sol1'], // Missing eip155
+          },
+        },
       });
 
       await expect(promise).rejects.toThrow('No accounts available for current chain');
@@ -252,9 +252,9 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: []  // Empty array
-          }
-        }
+            eip155: [], // Empty array
+          },
+        },
       });
 
       await expect(promise).rejects.toThrow('No accounts available for current chain');
@@ -270,12 +270,12 @@ describe('Ethereumwallet.ethereum', () => {
         result: {
           accounts: {
             eip155: [
-              'invalid-format',  // Should be 'eip155:1:0x...'
-              'eip155:1',  // Missing address part
-              ':0x123'  // Missing chain part
-            ]
-          }
-        }
+              'invalid-format', // Should be 'eip155:1:0x...'
+              'eip155:1', // Missing address part
+              ':0x123', // Missing chain part
+            ],
+          },
+        },
       });
 
       // Should handle gracefully, filtering out invalid addresses
@@ -295,10 +295,10 @@ describe('Ethereumwallet.ethereum', () => {
               'eip155:1:0xeth1',
               'eip155:56:0xbsc1',
               'eip155:8453:0xbase1',
-              'eip155:1:0xeth2',  // Multiple for same chain
-            ]
-          }
-        }
+              'eip155:1:0xeth2', // Multiple for same chain
+            ],
+          },
+        },
       });
 
       await promise;
@@ -317,12 +317,12 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: ['eip155:1:0xeth1']
+            eip155: ['eip155:1:0xeth1'],
           },
           chains: {
-            eip155: 'eip155:137'  // Polygon - not supported
-          }
-        }
+            eip155: 'eip155:137', // Polygon - not supported
+          },
+        },
       });
 
       await promise;
@@ -347,8 +347,8 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         error: {
           code: 4001,
-          message: 'User denied account access'
-        }
+          message: 'User denied account access',
+        },
       });
 
       await expect(promise).rejects.toThrow('User denied account access');
@@ -362,8 +362,8 @@ describe('Ethereumwallet.ethereum', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { eip155: ['eip155:1:0xfirst'] }
-        }
+          accounts: { eip155: ['eip155:1:0xfirst'] },
+        },
       });
       await promise;
 
@@ -380,8 +380,8 @@ describe('Ethereumwallet.ethereum', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { eip155: ['eip155:1:0xsecond'] }
-        }
+          accounts: { eip155: ['eip155:1:0xsecond'] },
+        },
       });
       await promise;
 
@@ -545,13 +545,9 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-              'eip155:8453:0xbase1'
-            ]
-          }
-        }
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1', 'eip155:8453:0xbase1'],
+          },
+        },
       });
       await promise;
       jest.clearAllMocks();
@@ -559,14 +555,14 @@ describe('Ethereumwallet.ethereum', () => {
     it('should handle empty message', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: ['', '0xeth1']
+        params: ['', '0xeth1'],
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        result: '0xemptysig'
+        result: '0xemptysig',
       });
 
       const signature = await promise;
@@ -578,7 +574,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.PERSONAL_SIGN,
-          params: ['Hello', '0xbsc1']
+          params: ['Hello', '0xbsc1'],
         })
       ).rejects.toThrow('not available on chain');
     });
@@ -587,21 +583,21 @@ describe('Ethereumwallet.ethereum', () => {
       // Switch to BSC
       await wallet.ethereum.request({
         method: CONNECTION_METHODS.WALLET_SWITCH_ETHEREUM_CHAIN,
-        params: [{ chainId: '0x38' }]
+        params: [{ chainId: '0x38' }],
       });
 
       jest.clearAllMocks();
 
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: ['Hello', '0xbsc1']
+        params: ['Hello', '0xbsc1'],
       });
 
       simulateWalletMessage('READY');
 
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          chainId: 'eip155:56'  // BSC chain
+          chainId: 'eip155:56', // BSC chain
         }),
         'http://localhost:3001'
       );
@@ -609,7 +605,7 @@ describe('Ethereumwallet.ethereum', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        result: '0xbscsig'
+        result: '0xbscsig',
       });
 
       const signature = await promise;
@@ -620,14 +616,14 @@ describe('Ethereumwallet.ethereum', () => {
       const hexMessage = '0x48656c6c6f'; // "Hello" in hex
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: [hexMessage, '0xeth1']
+        params: [hexMessage, '0xeth1'],
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        result: '0xhexsig'
+        result: '0xhexsig',
       });
 
       const signature = await promise;
@@ -638,7 +634,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.PERSONAL_SIGN,
-          params: ['message'] // Missing address
+          params: ['message'], // Missing address
         })
       ).rejects.toThrow('message and address required');
     });
@@ -646,14 +642,14 @@ describe('Ethereumwallet.ethereum', () => {
     it('should handle user rejection', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.PERSONAL_SIGN,
-        params: ['Hello', '0xeth1']
+        params: ['Hello', '0xeth1'],
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.PERSONAL_SIGN,
-        error: { code: 4001, message: 'User rejected' }
+        error: { code: 4001, message: 'User rejected' },
       });
 
       await expect(promise).rejects.toThrow('User rejected');
@@ -711,7 +707,7 @@ describe('Ethereumwallet.ethereum', () => {
       const tx = { from: '0xeth1', to: '0xrecipient', value: '0x1000' };
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        params: [tx]
+        params: [tx],
       });
 
       simulateWalletMessage('READY');
@@ -719,7 +715,7 @@ describe('Ethereumwallet.ethereum', () => {
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           chainId: 'eip155:1',
-          params: [expect.objectContaining(tx)]
+          params: [expect.objectContaining(tx)],
         }),
         'http://localhost:3001'
       );
@@ -727,7 +723,7 @@ describe('Ethereumwallet.ethereum', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        result: '0xtxhash'
+        result: '0xtxhash',
       });
 
       await promise;
@@ -737,7 +733,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-          params: [{ to: '0xrecipient', value: '0x1000' }]
+          params: [{ to: '0xrecipient', value: '0x1000' }],
         })
       ).rejects.toThrow('From address not connected');
     });
@@ -753,23 +749,25 @@ describe('Ethereumwallet.ethereum', () => {
         gasPrice: '1000000000',
         maxFeePerGas: '2000000000',
         maxPriorityFeePerGas: '1000000000',
-        chainId: 1
+        chainId: 1,
       };
 
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        params: [tx]
+        params: [tx],
       });
 
       simulateWalletMessage('READY');
 
       expect(mockPopup.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          params: [expect.objectContaining({
-            from: '0xeth1',
-            data: '0xdeadbeef',
-            nonce: 5
-          })]
+          params: [
+            expect.objectContaining({
+              from: '0xeth1',
+              data: '0xdeadbeef',
+              nonce: 5,
+            }),
+          ],
         }),
         'http://localhost:3001'
       );
@@ -777,7 +775,7 @@ describe('Ethereumwallet.ethereum', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        result: '0xtxhash'
+        result: '0xtxhash',
       });
 
       await promise;
@@ -786,7 +784,7 @@ describe('Ethereumwallet.ethereum', () => {
     it('should handle popup closed during transaction', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SEND_TRANSACTION,
-        params: [{ from: '0xeth1', to: '0xrecipient', value: '0x1000' }]
+        params: [{ from: '0xeth1', to: '0xrecipient', value: '0x1000' }],
       });
 
       simulateWalletMessage('READY');
@@ -811,13 +809,9 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-              'eip155:8453:0xbase1'
-            ]
-          }
-        }
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1', 'eip155:8453:0xbase1'],
+          },
+        },
       });
       await promise;
       jest.clearAllMocks();
@@ -826,14 +820,14 @@ describe('Ethereumwallet.ethereum', () => {
       const tx = { from: '0xeth1', to: '0xrecipient', value: '0x1000' };
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SIGN_TRANSACTION,
-        params: [tx]
+        params: [tx],
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SIGN_TRANSACTION,
-        result: '0xsignedtx'
+        result: '0xsignedtx',
       });
 
       const signedTx = await promise;
@@ -846,7 +840,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.ETH_SIGN_TRANSACTION,
-          params: [{ from: '0xeth1', to: '0xrecipient' }]
+          params: [{ from: '0xeth1', to: '0xrecipient' }],
         })
       ).rejects.toThrow('Not connected');
     });
@@ -866,13 +860,9 @@ describe('Ethereumwallet.ethereum', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            eip155: [
-              'eip155:1:0xeth1',
-              'eip155:56:0xbsc1',
-              'eip155:8453:0xbase1'
-            ]
-          }
-        }
+            eip155: ['eip155:1:0xeth1', 'eip155:56:0xbsc1', 'eip155:8453:0xbase1'],
+          },
+        },
       });
       await promise;
       jest.clearAllMocks();
@@ -881,32 +871,30 @@ describe('Ethereumwallet.ethereum', () => {
       types: {
         EIP712Domain: [
           { name: 'name', type: 'string' },
-          { name: 'version', type: 'string' }
+          { name: 'version', type: 'string' },
         ],
-        Message: [
-          { name: 'content', type: 'string' }
-        ]
+        Message: [{ name: 'content', type: 'string' }],
       },
       domain: {
         name: 'Test',
-        version: '1'
+        version: '1',
       },
       message: {
-        content: 'Hello'
-      }
+        content: 'Hello',
+      },
     };
 
     it('should sign typed data v4', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-        params: ['0xeth1', JSON.stringify(typedData)]
+        params: ['0xeth1', JSON.stringify(typedData)],
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-        result: '0xtypedsig'
+        result: '0xtypedsig',
       });
 
       const signature = await promise;
@@ -916,14 +904,14 @@ describe('Ethereumwallet.ethereum', () => {
     it('should handle typed data as object', async () => {
       const promise = wallet.ethereum.request({
         method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-        params: ['0xeth1', typedData] // Object instead of string
+        params: ['0xeth1', typedData], // Object instead of string
       });
 
       simulateWalletMessage('READY');
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-        result: '0xtypedsig'
+        result: '0xtypedsig',
       });
 
       const signature = await promise;
@@ -934,7 +922,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-          params: ['0xwrong', typedData]
+          params: ['0xwrong', typedData],
         })
       ).rejects.toThrow('Account not connected');
     });
@@ -943,7 +931,7 @@ describe('Ethereumwallet.ethereum', () => {
       await expect(
         wallet.ethereum.request({
           method: EIP155_METHODS.ETH_SIGN_TYPED_DATA_V4,
-          params: ['0xeth1'] // Missing data
+          params: ['0xeth1'], // Missing data
         })
       ).rejects.toThrow('address and data required');
     });

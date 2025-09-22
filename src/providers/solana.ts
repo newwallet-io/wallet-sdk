@@ -33,7 +33,7 @@ export class SolanaProvider {
   private _targetWalletOrigin: string;
   private _connected: boolean = false;
   private _publicKey: string | null = null;
-  private _accounts: string[] = [];
+  private _accountsByChain: { [chainId: string]: string[] } = {};
   private _supportedChains: string[] = [];
   private _currentChain: string = CHAIN_IDS.SOLANA_MAINNET;
   private _eventListeners: { [event: string]: Function[] } = {};
@@ -42,6 +42,13 @@ export class SolanaProvider {
   constructor(targetWalletUrl: string) {
     this._targetWalletUrl = targetWalletUrl;
     this._targetWalletOrigin = new URL(targetWalletUrl).origin;
+  }
+
+    /**
+   * Get accounts for current chain
+   */
+  private get _accounts(): string[] {
+    return this._accountsByChain[this._currentChainId] || [];
   }
 
   /**
@@ -60,7 +67,20 @@ export class SolanaProvider {
       const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
 
       this._connectionResult = result;
-      this._accounts = extractAccountsForNamespace(result, 'solana');
+      const allAccounts = extractAccountsForNamespace(result, 'solana');
+      allAccounts.forEach((accountStr) => {
+        const parts = accountStr.split(':');
+        if (parts.length >= 3) {
+          const chainId = `${parts[0]}:${parts[1]}`; // 'eip155:1'
+          const address = parts.slice(2).join(':'); // '0x123...'
+
+          if (!this._accountsByChain[chainId]) {
+            this._accountsByChain[chainId] = [];
+          }
+          this._accountsByChain[chainId].push(address);
+        }
+      });
+      console.log("extractAccountsForNamespace", this._accounts)
       if (!this._accounts.length) {
         throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
       }
@@ -140,12 +160,10 @@ export class SolanaProvider {
 
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
-      [
-        {
-          message: encodedMessage,
-          pubkey: this._publicKey,
-        },
-      ],
+      {
+        message: encodedMessage,
+        pubkey: this._publicKey,
+      },
       this._currentChain
     );
     if (!result || typeof result.signature !== 'string') {
@@ -167,12 +185,10 @@ export class SolanaProvider {
     const serialized = serializeBase64SolanaTransaction(transaction);
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
-      [
-        {
-          transaction: serialized,
-          pubkey: this._publicKey,
-        },
-      ],
+      {
+        transaction: serialized,
+        pubkey: this._publicKey,
+      },
       this._currentChain
     );
     if (!result || typeof result.transaction !== 'string' || typeof result.signature !== 'string') {
@@ -197,11 +213,9 @@ export class SolanaProvider {
     });
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_ALL_TRANSACTIONS,
-      [
-        {
-          transactions: serializedTransactions,
-        },
-      ],
+      {
+        transactions: serializedTransactions,
+      },
       this._currentChain
     );
     if (!result || !Array.isArray(result.transactions)) {
@@ -233,12 +247,10 @@ export class SolanaProvider {
 
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_AND_SEND_TRANSACTION,
-      [
-        {
-          transaction: serialized,
-          sendOptions,
-        },
-      ],
+      {
+        transaction: serialized,
+        sendOptions,
+      },
       this._currentChain
     );
     if (!result || typeof result.signature !== 'string') {
@@ -270,7 +282,7 @@ export class SolanaProvider {
   /**
    * Generic signing request handler
    */
-  private async _makeSigningRequest(method: string, params: any[], chainId: string): Promise<any> {
+  private async _makeSigningRequest(method: string, params: any, chainId: string): Promise<any> {
     return new Promise((resolve, reject) => {
       const popup = openPopup(this._targetWalletUrl);
       if (!popup) {
@@ -287,6 +299,7 @@ export class SolanaProvider {
 
         if (data?.type === 'READY' && !requestSent) {
           const request = createPostMessageRequest(method, params, chainId);
+          console.log('createPostMessageRequest', request);
           popup.postMessage(request, this._targetWalletOrigin);
           requestSent = true;
         }
