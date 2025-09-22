@@ -1,410 +1,189 @@
-# NewWallet SDK Documentation
-[![Demo App](https://img.shields.io/badge/Demo-Try%20Now-4CAF50)](https://dapp-demo.newwallet.io/)
-## Introduction
+# NewWallet SDK
 
-NewWallet SDK allows developers to connect their decentralized applications (DApps) to NewWallet, enabling users to interact with multiple blockchain networks including Ethereum and Solana. The SDK provides a consistent interface for wallet connection, transaction signing, and other blockchain operations.
+A JavaScript/TypeScript SDK for integrating with NewWallet - a passkey-powered Web3 wallet that supports multiple blockchain networks.
 
 ## Installation
-
-### NPM
 
 ```bash
 npm install @newwallet/wallet-sdk
 ```
 
-### Yarn
+or
 
 ```bash
 yarn add @newwallet/wallet-sdk
 ```
 
-## Usage
+## Features
 
-### Initialize the SDK
+- 🔐 **Secure** - Passkey-based authentication
+- ⛓️ **Multi-chain** - Support for Ethereum, BSC, Base, and Solana
+- 🔄 **Chain Switching** - Seamless switching between supported networks
+- 📱 **Cross-platform** - Works in browsers and web applications
+- 🎯 **WalletConnect Compatible** - Follows WalletConnect v2 standards
+- 🚀 **Simple API** - Easy-to-use interface for Web3 interactions
+
+## Quick Start
 
 ```javascript
 import NewWallet from '@newwallet/wallet-sdk';
 
-// Initialize with default options
+// Initialize the SDK
 const wallet = new NewWallet();
 
+// Connect to Ethereum
+const accounts = await wallet.ethereum.request({ 
+  method: 'eth_requestAccounts' 
+});
+console.log('Connected:', accounts[0]);
+
+// Connect to Solana
+const publicKey = await wallet.solana.connect();
+console.log('Solana pubkey:', publicKey);
 ```
 
-### Direct script tag
+## Basic Usage
 
-```html
-<script src="https://unpkg.com/@newwallet/wallet-sdk@latest/dist/index.js"></script>
+### Ethereum, BSC, and Base
+
+```javascript
+// Connect (requests access to all EVM chains)
+const accounts = await wallet.ethereum.request({
+  method: 'eth_requestAccounts'
+});
+
+// Get current chain
+const chainId = await wallet.ethereum.request({
+  method: 'eth_chainId'
+}); // Returns '0x1' for Ethereum mainnet
+
+// Switch to BSC
+await wallet.ethereum.request({
+  method: 'wallet_switchEthereumChain',
+  params: [{ chainId: '0x38' }] // BSC mainnet
+});
+
+// Sign a message
+const signature = await wallet.ethereum.request({
+  method: 'personal_sign',
+  params: ['Hello World', accounts[0]]
+});
+
+// Send transaction
+const txHash = await wallet.ethereum.request({
+  method: 'eth_sendTransaction',
+  params: [{
+    from: accounts[0],
+    to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1',
+    value: '0x5af3107a4000', // 0.0001 ETH in wei
+  }]
+});
 ```
 
-## Development
+### Solana
 
-```bash
-# Install dependencies
-yarn install
+```javascript
+// Connect
+const publicKey = await wallet.solana.connect();
 
-# Build all packages
-yarn build
+// Sign a message
+const signature = await wallet.solana.signMessage('Hello Solana!');
 
-# Start the demo app
-yarn install:demos
+// Sign and send a transaction
+import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
 
-# Start the demo app
-yarn demo
+const transaction = new Transaction().add(
+  SystemProgram.transfer({
+    fromPubkey: new PublicKey(publicKey),
+    toPubkey: new PublicKey('...'),
+    lamports: 100000000, // 0.1 SOL
+  })
+);
 
+const signature = await wallet.solana.signAndSendTransaction(transaction);
 ```
 
-## Ethereum API
+## Supported Networks
 
-NewWallet provides an Ethereum provider that follows the [EIP-1193](https://eips.ethereum.org/EIPS/eip-1193) standard, making it compatible with existing Ethereum DApps.
+| Network | Chain ID | Hex | Status |
+|---------|----------|-----|--------|
+| Ethereum | 1 | 0x1 | ✅ Mainnet |
+| Ethereum Sepolia | 11155111 | 0xaa36a7 | ✅ Testnet |
+| BSC | 56 | 0x38 | ✅ Mainnet |
+| BSC Testnet | 97 | 0x61 | ✅ Testnet |
+| Base | 8453 | 0x2105 | ✅ Mainnet |
+| Base Sepolia | 84532 | 0x14a34 | ✅ Testnet |
+| Solana | - | - | ✅ Mainnet |
+| Solana | - | - | ✅ Testnet |
 
-### Connect to Wallet
+## API Reference
+
+### Ethereum Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `eth_requestAccounts` | Connect and get accounts | None | `string[]` - Account addresses |
+| `eth_accounts` | Get connected accounts | None | `string[]` - Account addresses |
+| `eth_chainId` | Get current chain ID | None | `string` - Hex chain ID |
+| `wallet_switchEthereumChain` | Switch active chain | `[{ chainId: string }]` | `null` |
+| `personal_sign` | Sign message | `[message: string, address: string]` | `string` - Signature |
+| `eth_sendTransaction` | Send transaction | `[tx: TransactionRequest]` | `string` - Transaction hash |
+| `eth_signTransaction` | Sign transaction | `[tx: TransactionRequest]` | `string` - Signed transaction |
+| `eth_signTypedData_v4` | Sign typed data | `[address: string, typedData: any]` | `string` - Signature |
+
+### Solana Methods
+
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `connect()` | Connect to wallet | None | `Promise<string>` - Public key |
+| `disconnect()` | Disconnect from wallet | None | `Promise<void>` |
+| `signMessage(message)` | Sign a message | `string \| Uint8Array` | `Promise<string>` - Signature |
+| `signTransaction(transaction)` | Sign a transaction | `Transaction \| VersionedTransaction` | `Promise<Transaction \| VersionedTransaction>` |
+| `signAllTransactions(transactions)` | Sign multiple transactions | `Array<Transaction \| VersionedTransaction>` | `Promise<Array<Transaction \| VersionedTransaction>>` |
+| `signAndSendTransaction(transaction, sendOptions?)` | Sign and send transaction | `Transaction \| VersionedTransaction`, `SendOptions?` | `Promise<string>` - Signature |
+
+## Error Handling
 
 ```javascript
 try {
   const accounts = await wallet.ethereum.request({
     method: 'eth_requestAccounts'
   });
-  
-  console.log('Connected accounts:', accounts);
-  const activeAccount = accounts[0];
 } catch (error) {
-  console.error('Connection error:', error);
-}
-```
-
-### Get Chain ID
-
-```javascript
-try {
-  const chainId = await wallet.ethereum.request({
-    method: 'eth_chainId'
-  });
-  
-  console.log('Current chain ID:', chainId);
-} catch (error) {
-  console.error('Error getting chain ID:', error);
-}
-```
-
-### Sign a Message
-
-```javascript
-try {
-  const message = 'Hello, Ethereum!';
-  const from = '0x1234...'; // User's address
-  
-  const signature = await wallet.ethereum.request({
-    method: 'personal_sign',
-    params: [message, from]
-  });
-  
-  console.log('Message signature:', signature);
-} catch (error) {
-  console.error('Signing error:', error);
-}
-```
-
-### Sign a Transaction
-
-```javascript
-try {
-  const txParams = {
-    from: '0x1234...', // User's address
-    to: '0x9876...', // Recipient address
-    value: '0x38D7EA4C68000', // 0.001 ETH in wei (hex)
-    gas: '0x5208', // 21000 gas (hex)
-    gasPrice: '0x3B9ACA00', // 1 Gwei (hex)
-  };
-  
-  const signedTx = await wallet.ethereum.request({
-    method: 'eth_signTransaction',
-    params: [txParams]
-  });
-  
-  console.log('Signed transaction:', signedTx);
-} catch (error) {
-  console.error('Transaction signing error:', error);
-}
-```
-
-### Send a Transaction
-
-```javascript
-try {
-  const txParams = {
-    from: '0x1234...', // User's address
-    to: '0x9876...', // Recipient address
-    value: '0x38D7EA4C68000', // 0.001 ETH in wei (hex)
-    gas: '0x5208', // 21000 gas (hex)
-  };
-  
-  const txHash = await wallet.ethereum.request({
-    method: 'eth_sendTransaction',
-    params: [txParams]
-  });
-  
-  console.log('Transaction hash:', txHash);
-} catch (error) {
-  console.error('Transaction error:', error);
-}
-```
-
-### Event Listeners
-
-```javascript
-// Listen for accounts changed
-wallet.ethereum.on('accountsChanged', (accounts) => {
-  console.log('Accounts changed:', accounts);
-});
-
-// Listen for chain changed
-wallet.ethereum.on('chainChanged', (chainId) => {
-  console.log('Chain changed:', chainId);
-});
-
-// Remove an event listener
-const handleAccountsChanged = (accounts) => {
-  console.log('Accounts changed:', accounts);
-};
-
-wallet.ethereum.on('accountsChanged', handleAccountsChanged);
-wallet.ethereum.off('accountsChanged', handleAccountsChanged);
-```
-
-## Solana API
-
-NewWallet provides a Solana provider compatible with Phantom's interface for easy migration.
-
-### Connect to Wallet
-
-```javascript
-try {
-  const publicKey = await wallet.solana.connect();
-  console.log('Connected public key:', publicKey);
-} catch (error) {
-  console.error('Connection error:', error);
-}
-```
-
-### Disconnect
-
-```javascript
-await wallet.solana.disconnect();
-console.log('Disconnected from wallet');
-```
-
-### Check Connection Status
-
-```javascript
-const isConnected = wallet.solana.isConnected();
-console.log('Is connected:', isConnected);
-
-const publicKey = wallet.solana.getPublicKey();
-console.log('Current public key:', publicKey);
-```
-
-### Sign a Message
-
-```javascript
-try {
-  // Create a message as a Uint8Array
-  const message = new TextEncoder().encode('Hello, Solana!');
-  
-  const signature = await wallet.solana.signMessage(message);
-  console.log('Message signature:', signature);
-} catch (error) {
-  console.error('Signing error:', error);
-}
-```
-
-### Sign a Transaction
-
-```javascript
-try {
-  // Create a Solana transaction
-  // Note: In a real app, you would use @solana/web3.js to create this
-  const transaction = {
-    feePayer: wallet.solana.getPublicKey(),
-    recentBlockhash: 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
-    instructions: [
-      {
-        programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-        keys: [
-          { pubkey: wallet.solana.getPublicKey(), isSigner: true, isWritable: true },
-          { pubkey: 'GfEHGBwXDwL5RKmZFQKQx8F9MTiogi7XKD7pzYz3YTEu', isSigner: false, isWritable: true }
-        ],
-        data: new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0, 0]) // Simplified instruction
-      }
-    ]
-  };
-  
-  const signedTransaction = await wallet.solana.signTransaction(transaction);
-  console.log('Signed transaction:', signedTransaction);
-} catch (error) {
-  console.error('Transaction signing error:', error);
-}
-```
-
-### Sign Multiple Transactions
-
-```javascript
-try {
-  // Create multiple transactions
-  const transactions = [
-    // First transaction
-    {
-      feePayer: wallet.solana.getPublicKey(),
-      recentBlockhash: 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
-      instructions: [/* ... */]
-    },
-    // Second transaction
-    {
-      feePayer: wallet.solana.getPublicKey(),
-      recentBlockhash: 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
-      instructions: [/* ... */]
-    }
-  ];
-  
-  const signedTransactions = await wallet.solana.signAllTransactions(transactions);
-  console.log('Signed transactions:', signedTransactions);
-} catch (error) {
-  console.error('Transaction signing error:', error);
-}
-```
-
-### Sign and Send a Transaction
-
-```javascript
-try {
-  // Create a Solana transaction
-  const transaction = {
-    feePayer: wallet.solana.getPublicKey(),
-    recentBlockhash: 'EETubP5AKHgjPAhzPAFcb8BAY1hMH639CWCFTqi3hq1k',
-    instructions: [/* ... */]
-  };
-  
-  const signature = await wallet.solana.signAndSendTransaction(transaction);
-  console.log('Transaction signature:', signature);
-} catch (error) {
-  console.error('Transaction error:', error);
-}
-```
-
-### Event Listeners
-
-```javascript
-// Listen for connect events
-wallet.solana.on('connect', (publicKey) => {
-  console.log('Connected with public key:', publicKey);
-});
-
-// Listen for disconnect events
-wallet.solana.on('disconnect', () => {
-  console.log('Disconnected from wallet');
-});
-
-// Remove an event listener
-const handleConnect = (publicKey) => {
-  console.log('Connected with public key:', publicKey);
-};
-
-wallet.solana.on('connect', handleConnect);
-wallet.solana.off('connect', handleConnect);
-```
-
-## Error Handling
-
-The SDK provides a standardized error system with error codes and messages:
-
-```javascript
-import { ErrorCode } from '@newwallet/wallet-sdk';
-
-try {
-  // Attempt an operation
-  await wallet.ethereum.request({ method: 'eth_requestAccounts' });
-} catch (error) {
-  if (error.code === ErrorCode.USER_REJECTED) {
-    console.log('User rejected the request');
-  } else if (error.code === ErrorCode.UNAUTHORIZED) {
-    console.log('Unauthorized');
-  } else if (error.code === ErrorCode.DISCONNECTED) {
-    console.log('Wallet is disconnected');
-  } else {
-    console.error('Unknown error:', error.message);
+  switch (error.code) {
+    case 4001:
+      // User rejected the request
+      console.log('User denied account access');
+      break;
+    case 4900:
+      // Wallet is disconnected
+      console.log('Wallet disconnected');
+      break;
+    default:
+      console.error('Error:', error.message);
   }
 }
 ```
 
-Common error codes:
+### Error Codes
 
-- `ErrorCode.USER_REJECTED (4001)`: User rejected the request
-- `ErrorCode.UNAUTHORIZED (4100)`: The requested method/account has not been authorized
-- `ErrorCode.UNSUPPORTED_METHOD (4200)`: The provider does not support the requested method
-- `ErrorCode.DISCONNECTED (4900)`: The provider is disconnected
-- `ErrorCode.INTERNAL_ERROR (-32603)`: Internal JSON-RPC error
+| Code | Description |
+|------|-------------|
+| 4001 | User rejected request |
+| 4100 | Unauthorized - account/method not authorized |
+| 4200 | Unsupported method |
+| 4900 | Disconnected |
+| -32000 | Invalid input |
+| -32002 | Resource unavailable |
+| -32003 | Transaction rejected |
+| -32603 | Internal error |
 
-## API Reference
 
-### NewWallet
+## License
 
-- `constructor(options)`: Initialize the SDK
-  - `options.walletUrl`: Optional URL for the NewWallet
-
-- `isInstalled()`: Check if NewWallet is available
-  - Returns: `boolean`
-
-### Ethereum Provider
-
-- `request(args)`: Make a request to the Ethereum provider
-  - `args.method`: The RPC method to call
-  - `args.params`: Parameters for the method
-  - Returns: `Promise<any>`
-
-- `on(event, listener)`: Add an event listener
-  - `event`: Event name ('accountsChanged', 'chainChanged', etc.)
-  - `listener`: Callback function
-
-- `off(event, listener)`: Remove an event listener
-
-### Solana Provider
-
-- `connect()`: Connect to Solana wallet
-  - Returns: `Promise<string>` - The public key
-
-- `disconnect()`: Disconnect from Solana wallet
-  - Returns: `Promise<void>`
-
-- `isConnected()`: Check if connected to Solana wallet
-  - Returns: `boolean`
-
-- `getPublicKey()`: Get the connected public key
-  - Returns: `string | null`
-
-- `signMessage(message)`: Sign a message
-  - `message`: Uint8Array message to sign
-  - Returns: `Promise<string>` - The signature
-
-- `signTransaction(transaction)`: Sign a transaction
-  - `transaction`: Transaction to sign
-  - Returns: `Promise<any>` - The signed transaction
-
-- `signAllTransactions(transactions)`: Sign multiple transactions
-  - `transactions`: Array of transactions to sign
-  - Returns: `Promise<any[]>` - Array of signed transactions
-
-- `signAndSendTransaction(transaction)`: Sign and send a transaction
-  - `transaction`: Transaction to sign and send
-  - Returns: `Promise<string>` - The transaction signature
-
-- `on(event, listener)`: Add an event listener
-  - `event`: Event name ('connect', 'disconnect', etc.)
-  - `listener`: Callback function
-
-- `off(event, listener)`: Remove an event listener
+MIT - see [LICENSE](LICENSE) for details.
 
 ## Support and Resources
-
-For more information, examples, and updates:
 
 - [GitHub Repository](https://github.com/newwallet-io/@newwallet/wallet-sdk)
 - [Issue Tracker](https://github.com/newwallet-io/@newwallet/wallet-sdk/issues)
