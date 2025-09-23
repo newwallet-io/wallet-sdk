@@ -1,6 +1,5 @@
 // App.js
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import NewWallet from '@newwallet/wallet-sdk';
 import EnvironmentSelector from './components/EnvironmentSelector';
 import ConnectionSection from './components/ConnectionSection';
@@ -273,82 +272,96 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <div className="container">
-        {/* Header */}
-        <header className="app-header">
-          <h1>🔐 NewWallet SDK Demo</h1>
-          <p>Test all SDK features with different environments</p>
-        </header>
+    <div className="min-h-screen bg-slate-900">
+      {/* Optional: Add a subtle pattern or texture overlay */}
+      <div className="fixed inset-0 bg-black/20"></div>
+      
+      <div className="relative z-10 min-h-screen p-4 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <header className="text-center mb-8 py-8">
+            <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+              🔐 NewWallet SDK Demo
+            </h1>
+            <p className="text-xl text-gray-300">
+              Test all SDK features with different environments
+            </p>
+          </header>
 
-        {/* Environment Selector - Dropdown with Testnet default */}
-        <EnvironmentSelector
-          environment={environment}
-          onEnvironmentChange={setEnvironment}
-        />
+          {/* Main Container */}
+          <div className="backdrop-blur-xl bg-white/10 rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+            {/* Environment Selector */}
+            <EnvironmentSelector
+              environment={environment}
+              onEnvironmentChange={setEnvironment}
+            />
 
-        {/* Loading Indicator */}
-        {loading && (
-          <div className="loading-bar">
-            <div className="loading-spinner"></div>
-            <span>{loadingMessage}</span>
+            {/* Loading Indicator */}
+            {loading && (
+              <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-yellow-200 font-medium">{loadingMessage}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Main Content */}
+            <div className="p-6 md:p-8 space-y-6">
+              {/* Connection Section */}
+              <ConnectionSection
+                evmConnected={evmConnected}
+                solanaConnected={solanaConnected}
+                evmAccounts={evmAccounts}
+                solanaPublicKey={solanaPublicKey}
+                onConnectEVM={connectEVM}
+                onConnectSolana={connectSolana}
+                onDisconnect={disconnectAll}
+                loading={loading}
+              />
+
+              {/* EVM Section */}
+              {evmConnected && (
+                <EthereumSection
+                  sdk={sdk}
+                  accounts={evmAccounts}
+                  currentChain={currentEvmChain}
+                  supportedChains={supportedEvmChains}
+                  onChainChange={setCurrentEvmChain}
+                  onExecute={executeEvmAction}
+                  loading={loading}
+                  environment={environment}
+                />
+              )}
+
+              {/* Solana Section */}
+              {solanaConnected && (
+                <SolanaSection
+                  sdk={sdk}
+                  publicKey={solanaPublicKey}
+                  onExecute={executeSolanaAction}
+                  loading={loading}
+                  environment={environment}
+                />
+              )}
+
+              {/* Result Display */}
+              {(lastAction || lastError) && (
+                <ResultDisplay
+                  lastAction={lastAction}
+                  lastResult={lastResult}
+                  lastError={lastError}
+                  requestData={requestData}
+                  onClear={() => {
+                    setLastAction('');
+                    setLastResult(null);
+                    setLastError(null);
+                    setRequestData(null);
+                  }}
+                />
+              )}
+            </div>
           </div>
-        )}
-
-        {/* Main Content */}
-        <div className="main-content">
-          {/* Connection Section */}
-          <ConnectionSection
-            evmConnected={evmConnected}
-            solanaConnected={solanaConnected}
-            evmAccounts={evmAccounts}
-            solanaPublicKey={solanaPublicKey}
-            onConnectEVM={connectEVM}
-            onConnectSolana={connectSolana}
-            onDisconnect={disconnectAll}
-            loading={loading}
-          />
-
-          {/* EVM Section */}
-          {evmConnected && (
-            <EthereumSection
-              sdk={sdk}
-              accounts={evmAccounts}
-              currentChain={currentEvmChain}
-              supportedChains={supportedEvmChains}
-              onChainChange={setCurrentEvmChain}
-              onExecute={executeEvmAction}
-              loading={loading}
-              environment={environment}
-            />
-          )}
-
-          {/* Solana Section */}
-          {solanaConnected && (
-            <SolanaSection
-              sdk={sdk}
-              publicKey={solanaPublicKey}
-              onExecute={executeSolanaAction}
-              loading={loading}
-              environment={environment}
-            />
-          )}
-
-          {/* Result Display */}
-          {(lastAction || lastError) && (
-            <ResultDisplay
-              lastAction={lastAction}
-              lastResult={lastResult}
-              lastError={lastError}
-              requestData={requestData}
-              onClear={() => {
-                setLastAction('');
-                setLastResult(null);
-                setLastError(null);
-                setRequestData(null);
-              }}
-            />
-          )}
         </div>
       </div>
     </div>
