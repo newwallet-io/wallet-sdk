@@ -14,15 +14,20 @@ or
 yarn add @newwallet/wallet-sdk
 ```
 
-## Features
+## Development
 
-- 🔐 **Secure** - Passkey-based authentication
-- ⛓️ **Multi-chain** - Support for Ethereum, BSC, Base, and Solana
-- 🔄 **Chain Switching** - Seamless switching between supported networks
-- 📱 **Cross-platform** - Works in browsers and web applications
-- 🎯 **WalletConnect Compatible** - Follows WalletConnect v2 standards
-- 🚀 **Simple API** - Easy-to-use interface for Web3 interactions
+```bash
+# Install dependencies
+yarn install
 
+# Build all packages
+yarn build
+
+# Start the demo dapp
+yarn install:dapp
+yarn serve:dapp
+
+```
 ## Quick Start
 
 ```javascript

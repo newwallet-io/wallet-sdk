@@ -140,7 +140,7 @@ export async function requestWalletConnection(
       cleanup();
       reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
     };
-    
+
     const cleanup = () => {
       clearInterval(windowChecker);
       window.removeEventListener('message', handleMessage);
