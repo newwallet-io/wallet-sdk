@@ -118,8 +118,8 @@ const signature = await wallet.solana.signAndSendTransaction(transaction);
 | BSC Testnet | 97 | 0x61 | ✅ Testnet |
 | Base | 8453 | 0x2105 | ✅ Mainnet |
 | Base Sepolia | 84532 | 0x14a34 | ✅ Testnet |
-| Solana | - | - | ✅ Mainnet |
-| Solana | - | - | ✅ Testnet |
+| Solana | 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp | - | ✅ Mainnet |
+| Solana Testnet| 4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z | - | ✅ Testnet |
 
 ## API Reference
 
