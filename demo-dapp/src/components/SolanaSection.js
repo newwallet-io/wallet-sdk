@@ -12,7 +12,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
   const [activeAction, setActiveAction] = useState('');
   const [formData, setFormData] = useState({
     message: 'Hello from Solana!',
-    recipient: '11111111111111111111111111111112',
+    recipient: 'D4vVA53Eox5b7W4YmR27rfPhrdqHmRhDbVayMAMB8Ejq',
     amount: '0.001',
     txCount: 2
   });
@@ -24,23 +24,6 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
     { id: 'solana_signAndSendTransaction', label: 'Sign & Send Transaction' }
   ];
 
-  // Extract plain public key from WalletConnect format
-  const getPlainPublicKey = (key) => {
-    if (!key) return '';
-    
-    // If it's in WalletConnect format: "solana:chainId:publicKey"
-    if (key.includes(':')) {
-      const parts = key.split(':');
-      return parts[parts.length - 1]; // Get the last part (the actual public key)
-    }
-    
-    // Otherwise return as is
-    return key;
-  };
-
-  // Get the plain public key for use in transactions
-  const plainPublicKey = getPlainPublicKey(publicKey);
-
   // Get RPC endpoint based on environment
   const getRpcEndpoint = () => {
     switch(environment) {
@@ -48,8 +31,6 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
         return 'https://api.mainnet-beta.solana.com';
       case 'testnet':
         return 'https://api.testnet.solana.com';
-      case 'localhost':
-        return 'http://localhost:8899';
       default:
         return 'https://api.testnet.solana.com';
     }
@@ -62,15 +43,11 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
       // Convert SOL to lamports
       const lamports = Math.floor(parseFloat(amountInSol) * LAMPORTS_PER_SOL);
       
-      // Use plain public key
-      const fromPubkey = new PublicKey(plainPublicKey);
-      const toPubkey = new PublicKey(recipient);
-      
       // Create transaction
       const transaction = new Transaction().add(
         SystemProgram.transfer({
-          fromPubkey: fromPubkey,
-          toPubkey: toPubkey,
+          fromPubkey: new PublicKey(publicKey),
+          toPubkey: new PublicKey(recipient),
           lamports: lamports
         })
       );
@@ -78,14 +55,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
       // Get recent blockhash
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = blockhash;
-      transaction.feePayer = fromPubkey;
-      
-      console.log('Created transaction:', {
-        from: fromPubkey.toBase58(),
-        to: toPubkey.toBase58(),
-        lamports,
-        blockhash
-      });
+      transaction.feePayer = new PublicKey(publicKey);
       
       return transaction;
     } catch (error) {
@@ -100,13 +70,9 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
       
       switch(activeAction) {
         case 'solana_signMessage':
-          // Just pass the message - SDK will handle adding the public key internally
+          // Pass message and publicKey as SDK expects
+          // The SDK will handle the actual signing format
           params = formData.message;
-          
-          console.log('Signing message:', {
-            message: formData.message,
-            publicKey: plainPublicKey
-          });
           break;
           
         case 'solana_signTransaction':
@@ -159,8 +125,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
 
   const truncateAddress = (address) => {
     if (!address) return '';
-    const plain = getPlainPublicKey(address);
-    return `${plain.slice(0, 8)}...${plain.slice(-8)}`;
+    return `${address.slice(0, 8)}...${address.slice(-8)}`;
   };
 
   const renderInputs = () => {
@@ -178,9 +143,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               />
             </div>
             <div className="input-note">
-              Public key: {truncateAddress(plainPublicKey)}
-              <br />
-              Network: {environment === 'mainnet' ? 'Mainnet' : environment === 'testnet' ? 'Testnet' : 'Localhost'}
+              Public key will be automatically included: {truncateAddress(publicKey)}
             </div>
             <button className="btn btn-primary" onClick={handleExecute} disabled={loading}>
               Sign Message
@@ -213,8 +176,6 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               />
             </div>
             <div className="input-note">
-              From: {truncateAddress(plainPublicKey)}
-              <br />
               Network: {environment === 'mainnet' ? 'Mainnet' : environment === 'testnet' ? 'Testnet' : 'Localhost'}
             </div>
             <button className="btn btn-primary" onClick={handleExecute} disabled={loading}>
@@ -259,8 +220,6 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
             </div>
             <div className="input-note">
               Will create {formData.txCount} transactions of {formData.amount} SOL each
-              <br />
-              From: {truncateAddress(plainPublicKey)}
             </div>
             <button className="btn btn-primary" onClick={handleExecute} disabled={loading}>
               Sign All Transactions
@@ -280,13 +239,10 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
       <div className="chain-section">
         <div className="solana-info">
           <span className="info-label">Public Key:</span>
-          <span className="account-address">{truncateAddress(plainPublicKey)}</span>
+          <span className="account-address">{truncateAddress(publicKey)}</span>
           <button
             className="btn btn-small btn-secondary"
-            onClick={() => {
-              navigator.clipboard.writeText(plainPublicKey);
-              alert('Copied: ' + plainPublicKey);
-            }}
+            onClick={() => navigator.clipboard.writeText(publicKey)}
             title="Copy full address"
           >
             Copy

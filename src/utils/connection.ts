@@ -138,11 +138,9 @@ export async function requestWalletConnection(
 
     const handleClose = () => {
       cleanup();
-      if (!requestSent) {
-        reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window'));
-      }
+      reject(new ProviderError(ErrorCode.USER_REJECTED, 'User closed the wallet window.'));
     };
-
+    
     const cleanup = () => {
       clearInterval(windowChecker);
       window.removeEventListener('message', handleMessage);

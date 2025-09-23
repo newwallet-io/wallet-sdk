@@ -108,3 +108,18 @@ export function decodeMessage(encodedMessage: any): string | null {
     return encodedMessage;
   }
 }
+
+/**
+ * Get fee payer from Solana Transaction or VersionedTransaction
+ * This is Solana-specific - EVM transactions have 'from' field instead
+ */
+export function getSolanaFeePayer(transaction: Transaction | VersionedTransaction): string {
+  if (transaction instanceof VersionedTransaction) {
+    return transaction.message.staticAccountKeys[0].toBase58();
+  } else {
+    if (!transaction.feePayer) {
+      throw new Error('Transaction missing fee payer');
+    }
+    return transaction.feePayer.toBase58();
+  }
+}

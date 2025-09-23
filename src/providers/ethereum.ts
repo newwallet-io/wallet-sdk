@@ -249,7 +249,6 @@ export class EthereumProvider {
 
         if (data?.type === 'READY' && !requestSent) {
           const request = createPostMessageRequest(method, params, chainId);
-          console.log("createPostMessageRequest", request)
           popup.postMessage(request, this._targetWalletOrigin);
           requestSent = true;
         }

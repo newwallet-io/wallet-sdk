@@ -15,7 +15,7 @@ function EthereumSection({
   const [availableChains, setAvailableChains] = useState([]);
   const [formData, setFormData] = useState({
     message: 'Hello from NewWallet SDK Demo!',
-    toAddress: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7',
+    toAddress: '0x72E21B227661317F8f2dE8CfA3367876586D1d11',
     value: '0.001',
     data: '',
     typedData: JSON.stringify({

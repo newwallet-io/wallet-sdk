@@ -148,7 +148,7 @@ describe('SolanaProvider', () => {
   });
 
   describe('Connection', () => {
-    it.only('should connect and request both mainnet and testnet', async () => {
+    it('should connect and request both mainnet and testnet', async () => {
       const promise = wallet.solana.connect();
 
       // Check popup opened
@@ -176,7 +176,10 @@ describe('SolanaProvider', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['sol1pubkey', 'sol2pubkey'],
+            solana: [
+              'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:sol1pubkey',
+              'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:sol2pubkey',
+            ],
           },
           chains: {
             solana: CHAIN_IDS.SOLANA_MAINNET,
@@ -204,7 +207,7 @@ describe('SolanaProvider', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['testpubkey'],
+            solana: [`${CHAIN_IDS.SOLANA_TESTNET}:testpubkey`],
           },
           chains: {
             solana: CHAIN_IDS.SOLANA_TESTNET,
@@ -230,7 +233,7 @@ describe('SolanaProvider', () => {
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
           accounts: {
-            solana: ['sol1pubkey'],
+            solana: ['solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:sol1pubkey'],
           },
         },
       });
@@ -310,7 +313,7 @@ describe('SolanaProvider', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-        result: { accounts: { solana: ['legitpubkey'] } },
+        result: { accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:legitpubkey`] } },
       });
 
       const pubkey = await promise;
@@ -325,7 +328,7 @@ describe('SolanaProvider', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-        result: { accounts: { solana: ['pubkey1'] } },
+        result: { accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:pubkey1`] } },
       });
 
       const [result1, result2] = await Promise.all([promise1, promise2]);
@@ -358,7 +361,7 @@ describe('SolanaProvider', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-        result: { accounts: { solana: ['pubkey1'] } },
+        result: { accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:pubkey1`] } },
       });
       await promise;
 
@@ -372,7 +375,7 @@ describe('SolanaProvider', () => {
       simulateWalletMessage('response', {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
-        result: { accounts: { solana: ['pubkey2'] } },
+        result: { accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:pubkey2`] } },
       });
 
       const pubkey = await promise;
@@ -388,7 +391,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: ['pubkey1'] },
+          accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:pubkey1`] },
           chains: { solana: 'solana:unsupported_chain_id' },
         },
       });
@@ -425,7 +428,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: ['sol1pubkey'] },
+          accounts: { solana: ['solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:sol1pubkey'] },
         },
       });
       await promise;
@@ -453,7 +456,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: ['sol1pubkey'] },
+          accounts: { solana: ['solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:sol1pubkey'] },
           chains: { solana: CHAIN_IDS.SOLANA_MAINNET },
         },
       });
@@ -672,7 +675,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: [mockKeypair.publicKey] },
+          accounts: { solana: [`${CHAIN_IDS.SOLANA_TESTNET}:${mockKeypair.publicKey}`] },
           chains: { solana: CHAIN_IDS.SOLANA_TESTNET },
         },
       });
@@ -690,7 +693,6 @@ describe('SolanaProvider', () => {
           method: SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
           params: {
             transaction: expect.any(String), // base58 encoded
-            pubkey: mockKeypair.publicKey,
           },
           chainId: CHAIN_IDS.SOLANA_TESTNET, // Uses current chain
         }),
@@ -715,8 +717,6 @@ describe('SolanaProvider', () => {
     });
 
     it('should handle versioned transaction', async () => {
-      const mockKeypair = Keypair.generate();
-      const mockPublicKey = mockKeypair.publicKey.toString();
       const instructions = [
         SystemProgram.transfer({
           fromPubkey: mockKeypair.publicKey,
@@ -851,7 +851,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: [mockPublicKey] },
+          accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:${mockPublicKey}`] },
         },
       });
       await promise;
@@ -1023,7 +1023,7 @@ describe('SolanaProvider', () => {
         jsonrpc: '2.0',
         method: CONNECTION_METHODS.WALLET_REQUEST_CONNECTION,
         result: {
-          accounts: { solana: [mockKeypair.publicKey] },
+          accounts: { solana: [`${CHAIN_IDS.SOLANA_MAINNET}:${mockKeypair.publicKey}`] },
         },
       });
       await promise;

@@ -1,10 +1,8 @@
 // src/providers/solana.ts - Updated without isTestnet
 
 import {
-  PostMessageRequest,
   PostMessageResponse,
   SOLANA_METHODS,
-  CONNECTION_METHODS,
   CHAIN_IDS,
   ErrorCode,
   ProviderError,
@@ -23,6 +21,7 @@ import bs58 from 'bs58';
 import {
   serializeBase64SolanaTransaction,
   deserializeBase64SolanaTransaction,
+  getSolanaFeePayer,
 } from '../utils/serialization';
 
 // All supported Solana chains
@@ -33,22 +32,15 @@ export class SolanaProvider {
   private _targetWalletOrigin: string;
   private _connected: boolean = false;
   private _publicKey: string | null = null;
-  private _accountsByChain: { [chainId: string]: string[] } = {};
+  private _accounts: string[] = [];
   private _supportedChains: string[] = [];
-  private _currentChain: string = CHAIN_IDS.SOLANA_MAINNET;
+  private _currentChainId: string = CHAIN_IDS.SOLANA_MAINNET;
   private _eventListeners: { [event: string]: Function[] } = {};
   private _connectionResult: ConnectionResult | null = null;
 
   constructor(targetWalletUrl: string) {
     this._targetWalletUrl = targetWalletUrl;
     this._targetWalletOrigin = new URL(targetWalletUrl).origin;
-  }
-
-    /**
-   * Get accounts for current chain
-   */
-  private get _accounts(): string[] {
-    return this._accountsByChain[this._currentChainId] || [];
   }
 
   /**
@@ -67,36 +59,34 @@ export class SolanaProvider {
       const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
 
       this._connectionResult = result;
+
+      // Store supported chains (inferred from response)
+      this._supportedChains = ALL_SOLANA_CHAINS;
+      // Use wallet's active chain if provided
+      const activeChain = extractChainForNamespace(result, 'solana');
+      if (activeChain && this._supportedChains.includes(activeChain)) {
+        this._currentChainId = activeChain;
+      }
+      // TODO: No active chain found
+
       const allAccounts = extractAccountsForNamespace(result, 'solana');
+      this._accounts = [];
       allAccounts.forEach((accountStr) => {
         const parts = accountStr.split(':');
         if (parts.length >= 3) {
-          const chainId = `${parts[0]}:${parts[1]}`; // 'eip155:1'
+          const chainId = `${parts[0]}:${parts[1]}`; // 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
           const address = parts.slice(2).join(':'); // '0x123...'
-
-          if (!this._accountsByChain[chainId]) {
-            this._accountsByChain[chainId] = [];
+          if (this._currentChainId === chainId) {
+            this._accounts.push(address);
           }
-          this._accountsByChain[chainId].push(address);
         }
       });
-      console.log("extractAccountsForNamespace", this._accounts)
       if (!this._accounts.length) {
         throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
       }
 
       // Use first account as primary
       this._publicKey = this._accounts[0];
-
-      // Store supported chains (inferred from response)
-      this._supportedChains = ALL_SOLANA_CHAINS;
-
-      // Use wallet's active chain if provided
-      const activeChain = extractChainForNamespace(result, 'solana');
-      if (activeChain && this._supportedChains.includes(activeChain)) {
-        this._currentChain = activeChain;
-      }
-
       this._connected = true;
       this._emit('connect', this._publicKey);
 
@@ -164,7 +154,7 @@ export class SolanaProvider {
         message: encodedMessage,
         pubkey: this._publicKey,
       },
-      this._currentChain
+      this._currentChainId
     );
     if (!result || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
@@ -181,15 +171,22 @@ export class SolanaProvider {
     if (!this._connected || !this._publicKey) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
+    const feePayer = getSolanaFeePayer(transaction);
+    if (feePayer !== this._publicKey) {
+      throw new ProviderError(
+        ErrorCode.INVALID_REQUEST,
+        'Transaction fee payer is not login account'
+      );
+    }
     // Serialize transaction
     const serialized = serializeBase64SolanaTransaction(transaction);
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_TRANSACTION,
       {
         transaction: serialized,
-        pubkey: this._publicKey,
+        // pubkey: this._publicKey,
       },
-      this._currentChain
+      this._currentChainId
     );
     if (!result || typeof result.transaction !== 'string' || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
@@ -207,6 +204,25 @@ export class SolanaProvider {
     if (!this._connected || !this._publicKey) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
+    let commonFeePayer: string | null = null;
+    for (const transaction of transactions) {
+      const feePayer = getSolanaFeePayer(transaction);
+
+      if (commonFeePayer === null) {
+        commonFeePayer = feePayer;
+      } else if (commonFeePayer !== feePayer) {
+        throw new ProviderError(
+          ErrorCode.INVALID_REQUEST,
+          'All transactions must have the same fee payer'
+        );
+      }
+    }
+    if (commonFeePayer !== this._publicKey) {
+      throw new ProviderError(
+        ErrorCode.INVALID_REQUEST,
+        'Transaction fee payer is not login account'
+      );
+    }
     // Serialize all transactions
     const serializedTransactions = transactions.map((tx) => {
       return serializeBase64SolanaTransaction(tx);
@@ -216,7 +232,7 @@ export class SolanaProvider {
       {
         transactions: serializedTransactions,
       },
-      this._currentChain
+      this._currentChainId
     );
     if (!result || !Array.isArray(result.transactions)) {
       throw new ProviderError(
@@ -241,7 +257,13 @@ export class SolanaProvider {
     if (!this._connected || !this._publicKey) {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
-
+    const feePayer = getSolanaFeePayer(transaction);
+    if (feePayer !== this._publicKey) {
+      throw new ProviderError(
+        ErrorCode.INVALID_REQUEST,
+        'Transaction fee payer is not login account'
+      );
+    }
     // Serialize transaction
     const serialized = serializeBase64SolanaTransaction(transaction);
 
@@ -251,7 +273,7 @@ export class SolanaProvider {
         transaction: serialized,
         sendOptions,
       },
-      this._currentChain
+      this._currentChainId
     );
     if (!result || typeof result.signature !== 'string') {
       throw new ProviderError(ErrorCode.INTERNAL_ERROR, 'Invalid response: missing signature');
@@ -299,7 +321,6 @@ export class SolanaProvider {
 
         if (data?.type === 'READY' && !requestSent) {
           const request = createPostMessageRequest(method, params, chainId);
-          console.log('createPostMessageRequest', request);
           popup.postMessage(request, this._targetWalletOrigin);
           requestSent = true;
         }
@@ -339,7 +360,7 @@ export class SolanaProvider {
    * Get current chain
    */
   getCurrentChain(): string {
-    return this._currentChain;
+    return this._currentChainId;
   }
 
   /**
