@@ -15,7 +15,7 @@ function EnvironmentSelector({ environment, onEnvironmentChange }) {
   const currentEnv = environments.find(env => env.id === environment);
 
   return (
-    <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur-sm border-b border-white/10 px-6 py-5">
+    <div className="bg-purple-600/20 backdrop-blur-sm border-b border-white/10 px-6 py-5">
       <div className="flex flex-wrap items-center gap-4">
         <span className="text-white font-semibold text-lg">Environment:</span>
         

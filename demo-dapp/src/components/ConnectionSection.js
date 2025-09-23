@@ -20,7 +20,7 @@ function ConnectionSection({
     <div className="backdrop-blur-md bg-white/5 rounded-2xl p-6 border border-white/10 shadow-xl">
       <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
         <span className="text-3xl">🔗</span>
-        <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+        <span className="text-blue-400">
           Connection
         </span>
       </h2>
@@ -30,8 +30,8 @@ function ConnectionSection({
           className={`
             px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105
             ${evmConnected 
-              ? 'bg-gradient-to-r from-green-500 to-emerald-500 shadow-lg shadow-green-500/25' 
-              : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:shadow-lg hover:shadow-purple-500/25'
+              ? 'bg-green-500 shadow-lg shadow-green-500/25' 
+              : 'bg-blue-500 hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-500/25'
             } 
             ${loading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
@@ -45,8 +45,8 @@ function ConnectionSection({
           className={`
             px-6 py-3 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105
             ${solanaConnected 
-              ? 'bg-gradient-to-r from-green-500 to-teal-500 shadow-lg shadow-green-500/25' 
-              : 'bg-gradient-to-r from-teal-500 to-cyan-500 hover:shadow-lg hover:shadow-cyan-500/25'
+              ? 'bg-green-500 shadow-lg shadow-green-500/25' 
+              : 'bg-cyan-500 hover:bg-cyan-600 hover:shadow-lg hover:shadow-cyan-500/25'
             }
             ${loading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
@@ -60,7 +60,7 @@ function ConnectionSection({
           <button
             className={`
               px-6 py-3 rounded-lg font-semibold text-white 
-              bg-gradient-to-r from-red-500 to-pink-500 
+              bg-red-500 hover:bg-red-600
               hover:shadow-lg hover:shadow-red-500/25 
               transition-all duration-300 transform hover:scale-105
               ${loading ? 'opacity-50 cursor-not-allowed' : ''}
