@@ -152,7 +152,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               </p>
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -191,7 +191,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               </p>
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -240,7 +240,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               </p>
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -258,7 +258,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
     <div className="backdrop-blur-md bg-white/5 rounded-2xl p-6 border border-white/10 shadow-xl">
       <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
         <span className="text-3xl">☀️</span>
-        <span className="bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
+        <span className="text-cyan-400">
           Solana
         </span>
       </h2>
@@ -272,7 +272,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               {truncateAddress(publicKey)}
             </code>
             <button
-              className="px-3 py-1 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-md text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
+              className="px-3 py-1 bg-cyan-500 hover:bg-cyan-600 rounded-md text-white text-sm font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
               onClick={() => navigator.clipboard.writeText(publicKey)}
               title="Copy full address"
             >
@@ -289,7 +289,7 @@ function SolanaSection({ sdk, publicKey, onExecute, loading, environment }) {
               className={`
                 px-4 py-3 rounded-lg font-medium transition-all duration-300 transform hover:scale-105
                 ${activeAction === action.id 
-                  ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/25' 
+                  ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25' 
                   : 'bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white'
                 }
                 ${loading ? 'opacity-50 cursor-not-allowed' : ''}

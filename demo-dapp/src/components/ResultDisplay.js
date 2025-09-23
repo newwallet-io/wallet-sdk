@@ -16,66 +16,101 @@ function ResultDisplay({ lastAction, lastResult, lastError, requestData, onClear
     }
   };
 
-  // Helper function to handle BigInt serialization
-  const bigIntReplacer = (key, value) => {
+  // Helper function to handle BigInt and other special types serialization
+  const specialTypeReplacer = (key, value) => {
+    // Handle BigInt
     if (typeof value === 'bigint') {
-      return value.toString() + 'n'; // Add 'n' suffix to indicate it was a BigInt
+      return {
+        type: 'BigInt',
+        value: value.toString()
+      };
+    }
+    // Handle Buffer/Uint8Array (common in crypto operations)
+    if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+      return {
+        type: 'Buffer',
+        data: Array.from(value)
+      };
+    }
+    // Handle undefined (which JSON.stringify normally omits)
+    if (value === undefined) {
+      return 'undefined';
+    }
+    // Handle functions (for debugging)
+    if (typeof value === 'function') {
+      return '[Function: ' + (value.name || 'anonymous') + ']';
     }
     return value;
   };
 
-  const formatResult = (result) => {
-    if (result === null || result === undefined) {
+  // Format for display with special handling for crypto/blockchain data
+  const formatForDisplay = (data) => {
+    if (data === null || data === undefined) {
       return 'null';
     }
-    if (typeof result === 'bigint') {
-      return result.toString() + 'n';
+    
+    // Handle BigInt directly
+    if (typeof data === 'bigint') {
+      return data.toString() + 'n';
     }
-    if (typeof result === 'object') {
+    
+    // Handle hex strings (transaction hashes, addresses)
+    if (typeof data === 'string' && data.startsWith('0x')) {
+      return data;
+    }
+    
+    // Handle arrays of transactions or complex objects
+    if (typeof data === 'object') {
       try {
-        return JSON.stringify(result, bigIntReplacer, 2);
+        // Pretty print with special type handling
+        const formatted = JSON.stringify(data, specialTypeReplacer, 2);
+        
+        // Post-process to make BigInt values more readable
+        return formatted.replace(
+          /"type":\s*"BigInt",\s*"value":\s*"(\d+)"/g, 
+          '"$1n"'
+        );
       } catch (error) {
         console.error('Error formatting result:', error);
-        return String(result);
+        try {
+          // Fallback: try to convert to string
+          return String(data);
+        } catch {
+          return '[Complex Object]';
+        }
       }
     }
-    return String(result);
+    
+    return String(data);
+  };
+
+  const formatResult = (result) => {
+    return formatForDisplay(result);
   };
 
   const formatJSON = (data) => {
-    try {
-      if (typeof data === 'string') {
-        return data;
-      }
-      if (typeof data === 'bigint') {
-        return data.toString() + 'n';
-      }
-      return JSON.stringify(data, bigIntReplacer, 2);
-    } catch (error) {
-      console.error('Error formatting JSON:', error);
-      return String(data);
-    }
+    return formatForDisplay(data);
   };
 
   return (
-    <div className="backdrop-blur-md bg-gradient-to-br from-slate-900/50 to-purple-900/50 rounded-2xl p-6 border border-white/10 shadow-xl">
+    <div className="backdrop-blur-md bg-slate-800/50 rounded-2xl p-6 border border-white/10 shadow-xl">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h3 className="text-2xl font-bold text-white flex items-center gap-3">
           <span className="text-3xl">📊</span>
-          <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
+          <span className="text-green-400">
             Result
           </span>
         </h3>
         <div className="flex gap-2">
           <button
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 transform hover:scale-105"
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 transform hover:scale-105"
             onClick={() => copyToClipboard(formatResult(lastResult))}
           >
             {copied ? '✓ Copied' : 'Copy Result'}
           </button>
           <button
-            className="px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-gray-600/25 transition-all duration-300 transform hover:scale-105"
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-gray-600/25 transition-all duration-300 transform hover:scale-105"
             onClick={onClear}
           >
             Clear

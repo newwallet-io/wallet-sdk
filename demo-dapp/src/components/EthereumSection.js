@@ -49,12 +49,12 @@ function EthereumSection({
 
   // Chain mapping from WalletConnect format to display info
   const chainMapping = {
-    'eip155:1': { hex: '0x1', label: 'Ethereum Mainnet', testnet: false, color: 'from-blue-500 to-indigo-500' },
-    'eip155:11155111': { hex: '0xaa36a7', label: 'Ethereum Sepolia', testnet: true, color: 'from-blue-400 to-indigo-400' },
-    'eip155:56': { hex: '0x38', label: 'BSC Mainnet', testnet: false, color: 'from-yellow-500 to-orange-500' },
-    'eip155:97': { hex: '0x61', label: 'BSC Testnet', testnet: true, color: 'from-yellow-400 to-orange-400' },
-    'eip155:8453': { hex: '0x2105', label: 'Base Mainnet', testnet: false, color: 'from-blue-600 to-blue-400' },
-    'eip155:84532': { hex: '0x14a34', label: 'Base Sepolia', testnet: true, color: 'from-blue-500 to-blue-300' }
+    'eip155:1': { hex: '0x1', label: 'Ethereum Mainnet', testnet: false, color: 'bg-blue-500' },
+    'eip155:11155111': { hex: '0xaa36a7', label: 'Ethereum Sepolia', testnet: true, color: 'bg-blue-400' },
+    'eip155:56': { hex: '0x38', label: 'BSC Mainnet', testnet: false, color: 'bg-yellow-500' },
+    'eip155:97': { hex: '0x61', label: 'BSC Testnet', testnet: true, color: 'bg-yellow-400' },
+    'eip155:8453': { hex: '0x2105', label: 'Base Mainnet', testnet: false, color: 'bg-blue-600' },
+    'eip155:84532': { hex: '0x14a34', label: 'Base Sepolia', testnet: true, color: 'bg-blue-500' }
   };
 
   useEffect(() => {
@@ -172,7 +172,7 @@ function EthereumSection({
               />
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -213,7 +213,7 @@ function EthereumSection({
               />
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -235,7 +235,7 @@ function EthereumSection({
               />
             </div>
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -249,7 +249,7 @@ function EthereumSection({
         return (
           <div className="bg-black/20 rounded-xl p-6 mt-4">
             <button 
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-600 rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 disabled:opacity-50"
               onClick={handleExecute} 
               disabled={loading}
             >
@@ -269,7 +269,7 @@ function EthereumSection({
     <div className="backdrop-blur-md bg-white/5 rounded-2xl p-6 border border-white/10 shadow-xl">
       <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
         <span className="text-3xl">⚡</span>
-        <span className="bg-gradient-to-r from-ethereum to-blue-400 bg-clip-text text-transparent">
+        <span className="text-blue-400">
           EVM Chains (Ethereum / BSC / Base)
         </span>
       </h2>
@@ -296,7 +296,7 @@ function EthereumSection({
               })}
             </select>
             <button
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-medium text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 disabled:opacity-50"
               onClick={handleSwitchChain}
               disabled={loading}
             >
@@ -312,7 +312,7 @@ function EthereumSection({
         </div>
         
         {currentChainInfo && (
-          <div className="mb-6 px-4 py-2 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg border border-blue-500/30">
+          <div className="mb-6 px-4 py-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
             <span className="text-blue-300 text-sm">
               Active: {currentChainInfo.label} ({currentChain})
             </span>
@@ -327,7 +327,7 @@ function EthereumSection({
               className={`
                 px-4 py-3 rounded-lg font-medium transition-all duration-300 transform hover:scale-105
                 ${activeAction === action.id 
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/25' 
+                  ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25' 
                   : 'bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white'
                 }
                 ${loading ? 'opacity-50 cursor-not-allowed' : ''}
