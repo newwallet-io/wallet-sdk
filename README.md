@@ -192,4 +192,4 @@ MIT - see [LICENSE](LICENSE) for details.
 
 - [GitHub Repository](https://github.com/newwallet-io/@newwallet/wallet-sdk)
 - [Issue Tracker](https://github.com/newwallet-io/@newwallet/wallet-sdk/issues)
-- [Demo Applications](https://github.com/newwallet-io/@newwallet/wallet-sdk/tree/main/examples)
+- [Demo Applications](https://dapp-demo.newwallet.io/)
