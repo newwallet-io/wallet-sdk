@@ -69,7 +69,6 @@ export class EthereumProvider {
       };
 
       const result = await requestWalletConnection(this._targetWalletUrl, namespaces);
-      console.log("result", result)
 
       this._connectionResult = result;
 
