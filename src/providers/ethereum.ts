@@ -16,6 +16,7 @@ import {
   requestWalletConnection,
   extractAccountsForNamespace,
   extractChainForNamespace,
+  extractSupportedChainsForNamespace,
   chainIdToHex,
   ConnectionResult,
 } from '../utils/connection';
@@ -89,14 +90,24 @@ export class EthereumProvider {
         }
       });
       // Store supported chains
-      // this._supportedChains = result.supportedChains || ALL_EVM_CHAINS;
-      this._supportedChains = ALL_EVM_CHAINS;
+      this._supportedChains = extractSupportedChainsForNamespace(result, 'eip155');
 
+      if (this._supportedChains.length === 0) {
+        this._supportedChains = Object.keys(this._accountsByChain);
+      }
+
+      if (this._supportedChains.length === 0) {
+        throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No supported chains returned from wallet');
+      }
       // Use wallet's active chain if provided
       const activeChain = extractChainForNamespace(result, 'eip155');
       if (activeChain && this._supportedChains.includes(activeChain)) {
         this._currentChainId = activeChain;
         this._currentChainIdHex = chainIdToHex(activeChain);
+      } else {
+        // Default to first supported chain
+        this._currentChainId = this._supportedChains[0];
+        this._currentChainIdHex = chainIdToHex(this._supportedChains[0]);
       }
 
       // Check if we have accounts for current chain

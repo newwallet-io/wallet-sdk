@@ -1,6 +1,6 @@
 {
   "name": "@newwallet/wallet-sdk",
-  "version": "0.2.0-alpha.1",
+  "version": "0.3.0-alpha.1",
   "description": "Official SDK for interacting with NewWallet",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
@@ -13,7 +13,7 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "test": "yarn build && jest --testMatch='**/dist/**/*.test.js'",
+    "test": "yarn build && jest",
     "clean": "rm -rf dist",
     "serve:dapp": "cd demo-dapp && PORT=3002 npm start",
     "install:dapp": "cd demo-dapp && yarn install",

@@ -15,12 +15,23 @@ import {
 import { openPopup } from './index';
 
 /**
+ * WalletConnect SessionNamespace - Standard format
+ * This matches WalletConnect v2 specification exactly
+ */
+export interface SessionNamespace {
+  accounts: string[];      // CAIP-10 format: 'eip155:1:0x123...'
+  chains?: string[];       // CAIP-2 format: 'eip155:1'
+  methods: string[];       // RPC methods
+  events: string[];        // Event names
+}
+
+/**
  * Connection result from wallet
  */
 export interface ConnectionResult {
-  accounts: { [namespace: string]: string[] };
-  chains: { [namespace: string]: string };
-  methods: string[];
+  namespaces: {
+    [namespace: string]: SessionNamespace;
+  };
 }
 
 /**
@@ -166,33 +177,54 @@ export async function requestWalletConnection(
 }
 
 /**
- * Extract accounts for a specific namespace
+ * Extract accounts for a specific namespace from WalletConnect format
  */
 export function extractAccountsForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string[] {
-  let accounts: string[] = [];
-  if (connectionResult && connectionResult?.accounts) {
-    accounts = connectionResult?.accounts[namespace] || [];
-  }
-  if (!Array.isArray(accounts)) {
-    return [];
-  }
-  return accounts;
+  return connectionResult?.namespaces?.[namespace]?.accounts || [];
 }
 
 /**
- * Extract chain ID for a specific namespace
+ * Extract supported chains for a specific namespace from WalletConnect format
+ */
+export function extractSupportedChainsForNamespace(
+  connectionResult: ConnectionResult,
+  namespace: 'eip155' | 'solana'
+): string[] {
+  return connectionResult?.namespaces?.[namespace]?.chains || [];
+}
+
+/**
+ * Extract active chain for a specific namespace (returns first in chains array)
  */
 export function extractChainForNamespace(
   connectionResult: ConnectionResult,
   namespace: 'eip155' | 'solana'
 ): string | null {
-  if (connectionResult && connectionResult?.chains) {
-    return connectionResult.chains?.[namespace] || null;
-  }
-  return null; // Add optional chaining
+  const chains = connectionResult?.namespaces?.[namespace]?.chains;
+  return chains?.[0] || null;
+}
+
+/**
+ * Extract methods for a specific namespace
+ */
+export function extractMethodsForNamespace(
+  connectionResult: ConnectionResult,
+  namespace: 'eip155' | 'solana'
+): string[] {
+  return connectionResult?.namespaces?.[namespace]?.methods || [];
+}
+
+/**
+ * Extract events for a specific namespace
+ */
+export function extractEventsForNamespace(
+  connectionResult: ConnectionResult,
+  namespace: 'eip155' | 'solana'
+): string[] {
+  return connectionResult?.namespaces?.[namespace]?.events || [];
 }
 /**
  * Convert chain ID to hex for Ethereum compatibility
