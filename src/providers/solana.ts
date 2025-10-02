@@ -14,6 +14,7 @@ import {
   requestWalletConnection,
   extractAccountsForNamespace,
   extractChainForNamespace,
+  extractSupportedChainsForNamespace,
   ConnectionResult,
 } from '../utils/connection';
 import { Transaction, VersionedTransaction, SendOptions } from '@solana/web3.js';
@@ -22,6 +23,7 @@ import {
   serializeBase64SolanaTransaction,
   deserializeBase64SolanaTransaction,
   getSolanaFeePayer,
+  encodeSolanaMessage
 } from '../utils/serialization';
 
 // All supported Solana chains
@@ -60,31 +62,39 @@ export class SolanaProvider {
 
       this._connectionResult = result;
 
-      // Store supported chains (inferred from response)
-      this._supportedChains = ALL_SOLANA_CHAINS;
-      // Use wallet's active chain if provided
-      const activeChain = extractChainForNamespace(result, 'solana');
-      if (activeChain && this._supportedChains.includes(activeChain)) {
-        this._currentChainId = activeChain;
-      }
-      // TODO: No active chain found
-
       const allAccounts = extractAccountsForNamespace(result, 'solana');
       this._accounts = [];
+      const accountsByChain: { [chainId: string]: string[] } = {};
       allAccounts.forEach((accountStr) => {
         const parts = accountStr.split(':');
         if (parts.length >= 3) {
           const chainId = `${parts[0]}:${parts[1]}`; // 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'
-          const address = parts.slice(2).join(':'); // '0x123...'
-          if (this._currentChainId === chainId) {
-            this._accounts.push(address);
+          const address = parts.slice(2).join(':');
+          
+          if (!accountsByChain[chainId]) {
+            accountsByChain[chainId] = [];
           }
+          accountsByChain[chainId].push(address);
         }
       });
-      if (!this._accounts.length) {
-        throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No Solana accounts available');
-      }
 
+      // Store supported chains (inferred from response)
+      this._supportedChains = extractSupportedChainsForNamespace(result, 'solana');
+      if (this._supportedChains.length === 0) {
+        this._supportedChains = Object.keys(accountsByChain);
+      }
+      // Use wallet's active chain if provided
+      const activeChain = extractChainForNamespace(result, 'solana');
+      if (activeChain && this._supportedChains.includes(activeChain)) {
+        this._currentChainId = activeChain;
+      } else {
+        // Default to first supported chain
+        this._currentChainId = this._supportedChains[0];
+      }
+      this._accounts = accountsByChain[this._currentChainId] || [];
+      if (!this._accounts.length) {
+        throw new ProviderError(ErrorCode.UNAUTHORIZED, 'No accounts available for current chain');
+      }
       // Use first account as primary
       this._publicKey = this._accounts[0];
       this._connected = true;
@@ -140,18 +150,10 @@ export class SolanaProvider {
       throw new ProviderError(ErrorCode.DISCONNECTED, 'Not connected');
     }
 
-    // Convert message to base58 if it's Uint8Array
-    let encodedMessage: string;
-    if (message instanceof Uint8Array) {
-      encodedMessage = bs58.encode(message);
-    } else {
-      encodedMessage = message;
-    }
-
     const result = await this._makeSigningRequest(
       SOLANA_METHODS.SOLANA_SIGN_MESSAGE,
       {
-        message: encodedMessage,
+        message: encodeSolanaMessage(message),
         pubkey: this._publicKey,
       },
       this._currentChainId

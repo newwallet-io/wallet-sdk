@@ -5,7 +5,6 @@ function EthereumSection({
   sdk,
   accounts,
   currentChain,
-  supportedChains,
   onChainChange,
   onExecute,
   loading,
@@ -58,30 +57,29 @@ function EthereumSection({
   };
 
   useEffect(() => {
-    // Filter chains based on environment
-    if (supportedChains && supportedChains.length > 0) {
+    // Get supported chains directly from SDK
+    if (sdk && sdk.ethereum) {
+      let supportedChains = [];
+      
+      if (sdk.ethereum.getSupportedChains) {
+        supportedChains = sdk.ethereum.getSupportedChains();
+      } else {
+        // Fallback if method not available
+        supportedChains = environment === 'mainnet' 
+          ? ['eip155:1', 'eip155:56', 'eip155:8453']
+          : ['eip155:11155111', 'eip155:97', 'eip155:84532'];
+      }
+
+      // Only filter out chains we don't have mapping for
+      // Show all chains that the SDK supports
       const filtered = supportedChains.filter(chain => {
         const chainInfo = chainMapping[chain];
-        if (!chainInfo) return false;
-        
-        // For mainnet environment, show mainnet chains
-        // For testnet/localhost, show testnet chains
-        if (environment === 'mainnet') {
-          return !chainInfo.testnet;
-        } else {
-          return chainInfo.testnet;
-        }
+        return chainInfo !== undefined;
       });
       
       setAvailableChains(filtered);
-    } else {
-      // Fallback if no supported chains from SDK
-      const defaultChains = environment === 'mainnet' 
-        ? ['eip155:1', 'eip155:56', 'eip155:8453']
-        : ['eip155:11155111', 'eip155:97', 'eip155:84532'];
-      setAvailableChains(defaultChains);
     }
-  }, [supportedChains, environment]);
+  }, [sdk, environment]);
 
   const actions = [
     { id: 'personal_sign', label: 'Sign Message', icon: '✍️' },

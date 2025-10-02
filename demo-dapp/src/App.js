@@ -18,7 +18,6 @@ function App() {
   const [evmAccounts, setEvmAccounts] = useState([]);
   const [solanaPublicKey, setSolanaPublicKey] = useState('');
   const [currentEvmChain, setCurrentEvmChain] = useState('0xaa36a7'); // Default to Sepolia for testnet
-  const [supportedEvmChains, setSupportedEvmChains] = useState([]);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -84,31 +83,15 @@ function App() {
       });
       setCurrentEvmChain(chainId);
       
-      // Get supported chains from SDK if available
-      let chains = [];
-      if (sdk.ethereum.getSupportedChains) {
-        chains = sdk.ethereum.getSupportedChains();
-      } else {
-        // Fallback: Define default chains based on environment
-        if (environment === 'mainnet') {
-          chains = ['eip155:1', 'eip155:56', 'eip155:8453'];
-        } else {
-          chains = ['eip155:11155111', 'eip155:97', 'eip155:84532'];
-        }
-      }
-      setSupportedEvmChains(chains);
-      
       console.log('Connected to EVM chains:', {
         accounts,
-        chainId,
-        supportedChains: chains
+        chainId
       });
       
       showResult('eth_requestAccounts', accounts, { 
         method: 'eth_requestAccounts',
         environment,
-        chainId,
-        supportedChains: chains
+        chainId
       });
     } catch (error) {
       console.error('EVM connection failed:', error);
@@ -168,7 +151,6 @@ function App() {
     setEvmAccounts([]);
     setSolanaPublicKey('');
     setCurrentEvmChain(environment === 'mainnet' ? '0x1' : '0xaa36a7');
-    setSupportedEvmChains([]);
     setLastAction('disconnect');
     setLastResult(null);
     setLastError(null);
@@ -320,13 +302,12 @@ function App() {
                 loading={loading}
               />
 
-              {/* EVM Section */}
+              {/* EVM Section - No longer passing supportedChains prop */}
               {evmConnected && (
                 <EthereumSection
                   sdk={sdk}
                   accounts={evmAccounts}
                   currentChain={currentEvmChain}
-                  supportedChains={supportedEvmChains}
                   onChainChange={setCurrentEvmChain}
                   onExecute={executeEvmAction}
                   loading={loading}
