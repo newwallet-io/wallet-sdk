@@ -53,7 +53,11 @@ function EthereumSection({
     'eip155:56': { hex: '0x38', label: 'BSC Mainnet', testnet: false, color: 'bg-yellow-500' },
     'eip155:97': { hex: '0x61', label: 'BSC Testnet', testnet: true, color: 'bg-yellow-400' },
     'eip155:8453': { hex: '0x2105', label: 'Base Mainnet', testnet: false, color: 'bg-blue-600' },
-    'eip155:84532': { hex: '0x14a34', label: 'Base Sepolia', testnet: true, color: 'bg-blue-500' }
+    'eip155:84532': { hex: '0x14a34', label: 'Base Sepolia', testnet: true, color: 'bg-blue-500' },
+    'eip155:137': { hex: '0x2105', label: 'Polygon Mainnet', testnet: false, color: 'bg-blue-600' },
+    'eip155:80002': { hex: '0x14a34', label: 'Polygon Amoy', testnet: true, color: 'bg-blue-500' },
+    'eip155:42161': { hex: '0x2105', label: 'Arbitrum One', testnet: false, color: 'bg-blue-600' },
+    'eip155:421614': { hex: '0x14a34', label: 'Arbitrum Sepolia', testnet: true, color: 'bg-blue-500' }
   };
 
   useEffect(() => {
@@ -66,8 +70,8 @@ function EthereumSection({
       } else {
         // Fallback if method not available
         supportedChains = environment === 'mainnet' 
-          ? ['eip155:1', 'eip155:56', 'eip155:8453']
-          : ['eip155:11155111', 'eip155:97', 'eip155:84532'];
+          ? ['eip155:1', 'eip155:56', 'eip155:8453', 'eip155:137', 'eip155:42161']
+          : ['eip155:11155111', 'eip155:97', 'eip155:84532', 'eip155:80002', 'eip155:421614'];
       }
 
       // Only filter out chains we don't have mapping for
