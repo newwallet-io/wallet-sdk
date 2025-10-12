@@ -38,7 +38,7 @@ export interface ConnectionResult {
  * Build required namespaces for connection request
  * Always requests BOTH mainnet and testnet chains
  */
-export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]): any {
+export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base' | 'polygon' | 'arbitrum')[]): any {
   const namespaces: any = {};
 
   // Process EVM networks - always include both mainnet and testnet
@@ -56,6 +56,10 @@ export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc'
           break;
         case 'base':
           chains.push(CHAIN_IDS.BASE_MAINNET, CHAIN_IDS.BASE_SEPOLIA);
+        case 'polygon':
+          chains.push(CHAIN_IDS.POLYGON_MAINNET, CHAIN_IDS.POLYGON_AMOY);
+        case 'arbitrum':
+          chains.push(CHAIN_IDS.ARBITRUM_ONE, CHAIN_IDS.ARBITRUM_SEPOLIA);
           break;
       }
     });

@@ -44,7 +44,10 @@ export const CHAIN_IDS = {
   BSC_TESTNET: 'eip155:97',
   BASE_MAINNET: 'eip155:8453',
   BASE_SEPOLIA: 'eip155:84532',
-
+  POLYGON_MAINNET: 'eip155:137',
+  POLYGON_AMOY: 'eip155:80002',
+  ARBITRUM_ONE: 'eip155:42161',
+  ARBITRUM_SEPOLIA: 'eip155:421614',
   // Solana chains
   SOLANA_MAINNET: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
   SOLANA_TESTNET: 'solana:4uhcVJyU9pJkvQyS88uRDiswHXSCkY3z',
@@ -106,6 +109,8 @@ export enum Network {
   BSC = 'bsc',
   BASE = 'base',
   SOLANA = 'solana',
+  POLYGON = 'polygon',
+  ARBITRUM = 'arbitrum',
 }
 
 /**
@@ -119,6 +124,10 @@ export function toWalletConnectChainId(network: Network, isTestnet: boolean = fa
       return isTestnet ? CHAIN_IDS.BSC_TESTNET : CHAIN_IDS.BSC_MAINNET;
     case Network.BASE:
       return isTestnet ? CHAIN_IDS.BASE_SEPOLIA : CHAIN_IDS.BASE_MAINNET;
+    case Network.POLYGON:
+      return isTestnet ? CHAIN_IDS.POLYGON_AMOY : CHAIN_IDS.POLYGON_MAINNET;
+    case Network.ARBITRUM:
+      return isTestnet ? CHAIN_IDS.ARBITRUM_SEPOLIA : CHAIN_IDS.ARBITRUM_ONE;
     case Network.SOLANA:
       return isTestnet ? CHAIN_IDS.SOLANA_TESTNET : CHAIN_IDS.SOLANA_MAINNET;
     default:
@@ -146,6 +155,10 @@ export function parseWalletConnectChainId(chainId: string): {
       network = Network.BSC;
     } else if (chainNum === 8453 || chainNum === 84532) {
       network = Network.BASE;
+    }else if (chainNum === 137 || chainNum === 80002) {
+      network = Network.POLYGON;
+    } else if (chainNum === 42161 || chainNum === 421614) {
+      network = Network.ARBITRUM;
     }
   } else if (namespace === 'solana') {
     network = Network.SOLANA;
@@ -253,7 +266,7 @@ export class ProviderError extends Error {
  * Build required namespaces for connection request
  * Always requests BOTH mainnet and testnet chains
  */
-export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base')[]): any {
+export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc' | 'base' | 'polygon' | 'arbitrum')[]): any {
   const namespaces: any = {};
 
   // Process EVM networks - always include both mainnet and testnet
@@ -271,6 +284,12 @@ export function buildRequiredNamespaces(networks: ('ethereum' | 'solana' | 'bsc'
           break;
         case 'base':
           chains.push(CHAIN_IDS.BASE_MAINNET, CHAIN_IDS.BASE_SEPOLIA);
+          break;
+        case 'polygon':
+          chains.push(CHAIN_IDS.POLYGON_MAINNET, CHAIN_IDS.POLYGON_AMOY);
+          break;
+        case 'arbitrum':
+          chains.push(CHAIN_IDS.ARBITRUM_ONE, CHAIN_IDS.ARBITRUM_SEPOLIA);
           break;
       }
     });
